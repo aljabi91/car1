@@ -240,7 +240,7 @@ function renderMine(){
       <div>${esc(fmt(b.start))} to ${esc(fmt(b.end))}</div>
       <div class="small">${plural(+b.days||0,'day')} · <b style="color:var(--ink)">${esc(peso(b.total))}</b> · ${b.pickup==='delivery'?'Delivered to your address':'Pick up at the office'} · Ref <span class="plate">${esc(b.ref)}</span></div>
       ${i>=0?`<ol class="track" aria-label="Booking progress">${['Requested','Approved','Picked up','Returned'].map((l,k)=>`<li class="${k<=i?'done':''}">${l}</li>`).join('')}</ol>`:''}
-      ${needsDriver(b)&&!['rejected','cancelled'].includes(b.status)?`<div><b>Your driver:</b> ${b.driverName?`${esc(b.driverName)}, ${esc(b.driverPhone||'')}`:'<span class="small">the office will assign a driver and tell you here.</span>'}</div>`:''}
+      ${needsDriver(b)&&!['rejected','cancelled'].includes(b.status)?`<div class="drvline">${drvPic(b)}<span><b>Your driver:</b> ${b.driverName?`${esc(b.driverName)}, ${esc(b.driverPhone||'')}`:'<span class="small">the office will assign a driver and tell you here.</span>'}</span></div>`:''}
       ${(b.changes||[]).length?`<p class="okmsg" style="margin-top:6px;font-weight:500"><b>Changed by the office on ${esc(tAt(b.changes.at(-1).at))}:</b> ${esc(b.changes.at(-1).what)}</p>`:''}
       ${b.adminNote?`<p class="note" style="margin-top:6px"><b>Comment from the office:</b> ${esc(b.adminNote)}</p>`:''}
       ${['pickup','ret'].filter(sd=>hasHand(b,sd)).map(sd=>{const h=b.handover[sd];return`<div class="handc"><div><b>${HSIDE[sd][2]}</b>${h.updatedAt?` <span class="small">· ${esc(tAt(h.updatedAt))}</span>`:''}</div>${(h.files||[]).length?`<div class="pfgrid sm">${pfThumbs(S.uid,b,sd,false)}</div>`:''}${h.comment?`<p class="small" style="margin:0;color:var(--ink)"><b>Office comments:</b> ${esc(h.comment)}</p>`:''}</div>`}).join('')}
@@ -569,7 +569,7 @@ function openDetail(owner,id){
   $('#detBody').innerHTML=`<div class="mini"><div class="ph">${carPic(c||{name:b.carName})}</div><div><h3>${esc(b.carName)}</h3><div class="small">${esc(c?.plate||b.plate||'')}</div><span class="pill s-${esc(b.status)}">${esc(STS[b.status])}</span></div></div>
   ${clash.length?`<p class="note">Overlaps an approved booking for this car, ${esc(fmt(clash[0].start))} to ${esc(fmt(clash[0].end))}.</p>`:''}
   <dl class="kv"><dt>Full name</dt><dd>${esc(b.name)}</dd><dt>Mobile</dt><dd>${esc(b.phone)}</dd><dt>Email</dt><dd>${esc(b.email||'—')}</dd><dt>Address</dt><dd>${esc(b.address)}</dd><dt>Driver's license</dt><dd id="detLic"><span class="small">Loading photo…</span></dd><dt>Emergency contact</dt><dd>${esc(b.emergency||'—')}</dd>
-  <dt>Pickup</dt><dd>${esc(fmt(b.start))}</dd><dt>Return</dt><dd>${esc(fmt(b.end))} (${plural(+b.days||0,'day')})</dd><dt>How they get it</dt><dd>${b.pickup==='delivery'?'Deliver to address':'At the office'}</dd><dt>Extras</dt><dd>${esc((b.extras||[]).join(', ')||'None')}</dd>${needsDriver(b)?`<dt>Driver</dt><dd>${b.driverName?`<b>${esc(b.driverName)}</b>, ${esc(b.driverPhone||'')}`:'<span class="err">Needs a driver. Assign one below.</span>'}</dd>`:''}
+  <dt>Pickup</dt><dd>${esc(fmt(b.start))}</dd><dt>Return</dt><dd>${esc(fmt(b.end))} (${plural(+b.days||0,'day')})</dd><dt>How they get it</dt><dd>${b.pickup==='delivery'?'Deliver to address':'At the office'}</dd><dt>Extras</dt><dd>${esc((b.extras||[]).join(', ')||'None')}</dd>${needsDriver(b)?`<dt>Driver</dt><dd>${b.driverName?`<span class="drvline">${drvPic(b)}<span><b>${esc(b.driverName)}</b>, ${esc(b.driverPhone||'')}</span></span>`:'<span class="err">Needs a driver. Assign one below.</span>'}</dd>`:''}
   <dt>Total</dt><dd><b>${esc(peso(b.total))}</b> (${esc(peso(b.rate))} a day${b.extrasPerDay?` + ${esc(peso(b.extrasPerDay))} a day extras`:''}${b.delivery?` + ${esc(peso(b.delivery))} delivery`:''})</dd><dt>Deposit</dt><dd>${esc(peso(b.deposit))}</dd><dt>Customer notes</dt><dd>${esc(b.notes||'—')}</dd><dt>Requested</dt><dd>${esc(b.createdAt?new Date(b.createdAt).toLocaleString('en-PH'):'—')}</dd><dt>Terms</dt><dd>${b.termsAgreedAt?`Agreed on ${esc(tAt(b.termsAgreedAt))}`:'<span class="small">Not recorded</span>'}</dd>${(b.changes||[]).length?`<dt>Changes</dt><dd>${b.changes.map(c=>`<div><b>${esc(tAt(c.at))}:</b> ${esc(c.what)}</div>`).join('')}</dd>`:''}</dl>
   ${needsDriver(b)&&!['rejected','cancelled','completed'].includes(b.status)?`<div><label for="detDrv">Driver for this trip</label><div class="acts" style="justify-content:flex-start;flex-wrap:nowrap"><select id="detDrv" style="flex:1">${driverOpts(b.start,b.end,b.id,b.driverId)}</select><button class="btn" data-act="drv">${b.driverId?'Change driver':'Assign driver'}</button></div>${S.drivers.length?'':'<p class="hint">No drivers yet. Add them on the Drivers page.</p>'}</div>`:''}
   ${['approved','active','completed'].includes(b.status)||hasHand(b,'pickup')||hasHand(b,'ret')?`<div class="hands">${['pickup','ret'].map(sd=>{const h=b.handover?.[sd]||{};return`<section class="hand" aria-labelledby="hh-${sd}"><h3 id="hh-${sd}">${HSIDE[sd][0]}</h3><p class="small" style="margin:0">${HSIDE[sd][1]} ${esc(b.name.split(' ')[0])} can see these on their booking.</p>
@@ -635,8 +635,14 @@ function renderDrivers(){
   $('#drvNeed').classList.toggle('hide',!need.length);
   $('#drvNeed').innerHTML=need.length?`<b>${plural(need.length,'booking')} still need a driver:</b> `+need.map(b=>`<button class="btn sm" data-open="${esc(b.owner)}|${esc(b.id)}">${esc(b.ref)} · ${esc(b.name)} · ${esc(fmtD(b.start))}</button>`).join(' '):'';
 }
+function drvPic(b){const d=b.driverId&&S.drivers.find(x=>x.id===b.driverId);return d?.imageId?`<img class="drvpic" src="${esc(imgUrl(d.imageId))}" alt="Photo of ${esc(d.name)}" data-drvpic>`:''}
+function dThumb(sel,src,alt,delSel,lblSel,up){const t=$(sel);t.classList.toggle('has',!!src);t.innerHTML=src?`<img src="${esc(src)}" alt="${esc(alt)}">`:'No photo yet';$(delSel).classList.toggle('hide',!src);$(lblSel).textContent=src?'Change':up}
+function drawDrvThumbs(){const d=S.dEditing;
+  dThumb('#dImgThumb',S.dImg?S.dImgUrl:(!S.dImgDrop&&d?.imageId?imgUrl(d.imageId):''),'Photo of the driver','#dImgDel','#dImgL','Upload photo');
+  const lic=S.dLic||(!S.dLicDrop&&S.dLicOld)||'';dThumb('#dLicThumb',lic,"Driver's license of the driver",'#dLicDel','#dLicL','Upload license')}
 function openDriver(id){
-  const d=id?S.drivers.find(x=>x.id===id):null;S.dEditing=d;S.dImg=null;$('#dImgIn').value='';$('#dErr').textContent='';
+  const d=id?S.drivers.find(x=>x.id===id):null;S.dEditing=d;S.dImg=null;S.dImgDrop=false;S.dLic='';S.dLicDrop=false;S.dLicOld='';$('#dImgIn').value='';$('#dLicIn').value='';$('#dErr').textContent='';
+  drawDrvThumbs();if(d?.licImgId)pfGet('_staff',d.licImgId).then(x=>{if(S.dEditing===d&&x){S.dLicOld=x;drawDrvThumbs()}}).catch(()=>{});
   $('#drvT').textContent=d?'Edit '+d.name:'Add a driver';
   [['#dName','name'],['#dPhone','phone'],['#dLic','license'],['#dNotes','notes']].forEach(([s,k])=>$(s).value=d?.[k]||'');$('#dStatus').value=d?.status||'available';
   $('#dImgIn').disabled=!S.assets;$('#dDrv').showModal();
@@ -648,16 +654,22 @@ $('#drvForm').addEventListener('submit',async e=>{
   if(!v('#dLic'))return er("Enter the driver's license number.");
   const btn=$('#dSave');btn.disabled=true;btn.textContent='Saving…';
   try{
-    const old=S.dEditing;let imageId=old?.imageId||'';
+    const old=S.dEditing;let imageId=old?.imageId||'',licImgId=old?.licImgId||'';
     if(S.dImg){const up=await S.assets.upload(S.dImg);imageId=up.id;if(old?.imageId)S.assets.delete(old.imageId).catch(()=>{})}
-    const id=old?.id||'drv-'+uid();const data={name:v('#dName').replace(/\s+/g,' '),phone:v('#dPhone'),license:v('#dLic'),notes:v('#dNotes'),status:$('#dStatus').value,imageId,createdAt:old?.createdAt||Date.now(),updatedAt:Date.now()};
+    else if(S.dImgDrop&&imageId){if(S.assets)S.assets.delete(imageId).catch(()=>{});imageId=''}
+    if(S.dLic){const nid=await pfSave('_staff',S.dLic);if(licImgId)pfDel('_staff',licImgId);licImgId=nid}
+    else if(S.dLicDrop&&licImgId){pfDel('_staff',licImgId);licImgId=''}
+    const id=old?.id||'drv-'+uid();const data={name:v('#dName').replace(/\s+/g,' '),phone:v('#dPhone'),license:v('#dLic'),notes:v('#dNotes'),status:$('#dStatus').value,imageId,licImgId,createdAt:old?.createdAt||Date.now(),updatedAt:Date.now()};
     await serial('d'+id,()=>S.db.doc('drivers/'+id).set(data));
     if(old&&(old.name!==data.name||old.phone!==data.phone)){for(const doc of S.bdocs){if((doc.items||[]).some(b=>b.driverId===id&&LIVE.includes(b.status))){await saveOwner(doc.id,doc.items.map(b=>b.driverId===id&&LIVE.includes(b.status)?{...b,driverName:data.name,driverPhone:data.phone}:b))}}}
     $('#dDrv').close();toast(old?'Driver saved':'Driver added');
-  }catch(x){er('Not saved. Try again.')}
+  }catch(x){er('Not saved. '+(x?.message||'Try again.'))}
   finally{btn.disabled=false;btn.textContent='Save driver'}
 });
-$('#dImgIn').addEventListener('change',async()=>{const f=$('#dImgIn').files[0];if(!f)return;const b=await cropImage(f,1,600);if(!b){$('#dImgIn').value='';return}S.dImg=b});
+$('#dImgIn').addEventListener('change',async()=>{const f=$('#dImgIn').files[0];$('#dImgIn').value='';if(!f)return;const b=await cropImage(f,1,600);if(!b)return;S.dImg=b;S.dImgDrop=false;if(S.dImgUrl)URL.revokeObjectURL(S.dImgUrl);S.dImgUrl=URL.createObjectURL(b);drawDrvThumbs()});
+$('#dImgDel').addEventListener('click',()=>{S.dImg=null;S.dImgDrop=true;drawDrvThumbs()});
+$('#dLicIn').addEventListener('change',async()=>{const f=$('#dLicIn').files[0];$('#dLicIn').value='';if(!f)return;$('#dErr').textContent='';try{S.dLic=await photoToDataUrl(f);S.dLicDrop=false;drawDrvThumbs()}catch(x){$('#dErr').textContent=x.message||'The photo could not be used.'}});
+$('#dLicDel').addEventListener('click',()=>{S.dLic='';S.dLicDrop=true;drawDrvThumbs()});
 $('#addDrv').addEventListener('click',()=>openDriver(null));
 
 /* ---------- settings (admin) ---------- */
@@ -1211,6 +1223,7 @@ $('#setupForm').addEventListener('submit',async e=>{
 document.addEventListener('click',async e=>{
   const t=e.target;
   if(t.closest('[data-close]')){t.closest('dialog')?.close();return}
+  const dp=t.closest('[data-drvpic]');if(dp){openZoom(dp.src,dp.alt);return}
   const pv=t.closest('[data-pfview]');if(pv){const[o,bid,sd,i]=pv.dataset.pfview.split('|');openPf(o,bid,sd,+i);return}
   if(t.closest('[data-showterms]')){e.preventDefault();$('#tmBody').innerHTML=termsHtml(SET().terms)+(termsDate()?`<p class="small">Last updated ${esc(termsDate())}.</p>`:'');$('#dTerms').showModal();return}
   const th=t.closest('[data-th]');if(th){const[o,k]=th.dataset.th.split('|');const x=getThread(o,k);S.thread={owner:o,key:k,name:x.name,phone:x.phone};S.msgScrolled=false;renderMessages();markSeen();return}
@@ -1225,7 +1238,7 @@ document.addEventListener('click',async e=>{
   const de=t.closest('[data-dedit]');if(de){openDriver(de.dataset.dedit);return}
   const dd=t.closest('[data-ddel]');if(dd){const d=S.drivers.find(x=>x.id===dd.dataset.ddel);if(!d)return;const n=allBookings().filter(b=>b.driverId===d.id&&LIVE.includes(b.status)).length;
     if(!await ask(`Delete ${d.name} from the drivers list?${n?` They are assigned to ${plural(n,'open booking')}; those keep the driver's name until you change it.`:''}`,'Delete driver'))return;
-    try{await S.db.doc('drivers/'+d.id).delete();if(d.imageId&&S.assets)S.assets.delete(d.imageId).catch(()=>{});toast(d.name+' deleted')}catch(x){toast('Not deleted. Try again.')}return}
+    try{await S.db.doc('drivers/'+d.id).delete();if(d.imageId&&S.assets)S.assets.delete(d.imageId).catch(()=>{});if(d.licImgId)pfDel('_staff',d.licImgId);toast(d.name+' deleted')}catch(x){toast('Not deleted. Try again.')}return}
   if(t.closest('#chgAdmin2')){openSetup();return}
   if(t.closest('#showAll')){e.preventDefault();$('#fFree').checked=false;renderFleet();return}
   if(t.closest('#clearF')){S.f={type:'',trans:''};$('#fQ').value='';$('#fFree').checked=false;renderFleet();return}

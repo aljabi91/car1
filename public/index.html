@@ -6,7 +6,7 @@
 <title>Car Rental System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=202611262230">
+<link rel="stylesheet" href="css/style.css?v=202611262236">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -444,7 +444,10 @@
       </div>
       <div class="two">
         <div><label for="dStatus">Status</label><select id="dStatus"><option value="available">Available</option><option value="off">Off duty (can't be assigned)</option></select></div>
-        <div><label for="dImgIn">Photo</label><input type="file" id="dImgIn" accept="image/*"></div>
+      </div>
+      <div class="two">
+        <div><label for="dImgIn">Photo of the driver</label><div class="licbox"><button type="button" class="licthumb face" id="dImgThumb" aria-label="See the driver's photo larger">No photo yet</button><div style="display:grid;gap:6px"><label class="btn sm" for="dImgIn" id="dImgL">Upload photo</label><input type="file" id="dImgIn" accept="image/*" class="vh"><button type="button" class="btn sm danger hide" id="dImgDel">Remove</button></div></div><p class="hint">Customers see this photo on their booking, so they know who to meet.</p></div>
+        <div><label for="dLicIn">Photo of the driver's license</label><div class="licbox"><button type="button" class="licthumb sm" id="dLicThumb" aria-label="See the license photo larger">No photo yet</button><div style="display:grid;gap:6px"><label class="btn sm" for="dLicIn" id="dLicL">Upload license</label><input type="file" id="dLicIn" accept="image/*" class="vh"><button type="button" class="btn sm danger hide" id="dLicDel">Remove</button></div></div><p class="hint">Private: only the admin can see it.</p></div>
       </div>
       <div><label for="dNotes">Notes</label><input id="dNotes" placeholder="e.g. Knows Baguio and Tagaytay routes"></div>
       <p class="err" id="dErr" role="alert"></p>
@@ -544,6 +547,6 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<script src="js/app.js?v=202611262230"></script>
+<script src="js/app.js?v=202611262236"></script>
 </body>
 </html>
