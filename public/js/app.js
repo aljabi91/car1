@@ -6,7 +6,7 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const peso=n=>'₱'+Math.round(Number(n)||0).toLocaleString('en-PH');
 const TYPES=['Sedan','Hatchback','SUV','MPV / Van','Pickup'];
 const DEF_SET={extras:[{id:'driver',label:'With a driver',perDay:1500,driver:true},{id:'seat',label:'Child car seat',perDay:200,driver:false},{id:'xdriver',label:'Additional driver on the contract',perDay:300,driver:false}],delivery:500,cancelDays:2};
-const SET=()=>{const x=S.settings||{};return{extras:Array.isArray(x.extras)?x.extras:DEF_SET.extras,delivery:Number.isFinite(+x.delivery)&&x.delivery!==undefined?+x.delivery:DEF_SET.delivery,cancelDays:Number.isFinite(+x.cancelDays)&&x.cancelDays!==undefined?+x.cancelDays:DEF_SET.cancelDays}};
+const SET=()=>{const x=S.settings||{};return{siteName:String(x.siteName||'').trim()||'Car Rental',logoId:x.logoId||'',extras:Array.isArray(x.extras)?x.extras:DEF_SET.extras,delivery:Number.isFinite(+x.delivery)&&x.delivery!==undefined?+x.delivery:DEF_SET.delivery,cancelDays:Number.isFinite(+x.cancelDays)&&x.cancelDays!==undefined?+x.cancelDays:DEF_SET.cancelDays}};
 const EX=()=>SET().extras;
 const cdTxt=()=>plural(SET().cancelDays,'day');
 const needsDriver=b=>(b.extrasDetail||[]).some(x=>x.driver)||(b.extras||[]).includes('With a driver');
@@ -15,7 +15,7 @@ const STS={pending:'Pending',approved:'Approved',active:'Picked up',completed:'R
 const LIVE=['pending','approved','active'];
 const cancelBy=b=>new Date(+new Date(b.start)-SET().cancelDays*864e5);
 const canCancelNow=b=>['pending','approved'].includes(b.status)&&Date.now()<+cancelBy(b);
-const S={db:null,user:null,assets:null,uid:null,admin:false,editor:false,session:null,adminCfg:null,cfgLoaded:false,bReady:false,canWrite:true,ready:false,cars:[],gallery:[],bdocs:[],blocks:[],drivers:[],settings:null,chats:[],replies:[],thread:null,draft:'',local:false,adm:{status:'all',q:''},f:{type:'',trans:''},editing:null,newImg:null,dropImg:false,booking:null,step:1};
+const S={db:null,user:null,assets:null,uid:null,admin:false,editor:false,session:null,adminCfg:null,cfgLoaded:false,bReady:false,canWrite:true,ready:false,cars:[],gallery:[],bdocs:[],blocks:[],licCache:{},drivers:[],settings:null,chats:[],replies:[],thread:null,draft:'',local:false,adm:{status:'all',q:''},f:{type:'',trans:''},editing:null,newImg:null,dropImg:false,booking:null,step:1};
 
 /* ---------- helpers ---------- */
 const pad=n=>String(n).padStart(2,'0');
@@ -23,7 +23,9 @@ const toLocal=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T
 const parse=s=>s?new Date(s):null;
 const days=(a,b)=>{const ms=parse(b)-parse(a);return ms>0?Math.max(1,Math.ceil(ms/864e5-1/24)):0};
 const fmt=s=>{const d=parse(s);return d&&!isNaN(d)?d.toLocaleString('en-PH',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'—'};
-const fmtD=s=>{const d=parse(s);return d&&!isNaN(d)?d.toLocaleDateString('en-PH',{month:'short',day:'numeric'}):'—'};
+const dayOnly=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]):null};
+const fmtLong=s=>{const d=dayOnly(s)||parse(s);return d&&!isNaN(d)?d.toLocaleDateString('en-PH',{month:'long',day:'numeric',year:'numeric'}):''};
+const fmtD=s=>{const d=dayOnly(s)||parse(s);return d&&!isNaN(d)?d.toLocaleDateString('en-PH',{month:'short',day:'numeric'}):'—'};
 const plural=(n,w)=>`${n} ${w}${n===1?'':'s'}`;
 const uid=()=>Math.random().toString(36).slice(2,10);
 const ref=()=>'CR-'+Date.now().toString(36).slice(-4).toUpperCase()+Math.random().toString(36).slice(2,4).toUpperCase();
@@ -93,23 +95,33 @@ function endSession(){S.session=null;try{sessionStorage.removeItem('cr-session')
 
 /* ---------- routing ---------- */
 const CUST=[['fleet','Cars'],['my-bookings','My bookings'],['messages','Messages'],['my-details','My details']];
-const ADM=[['bookings','Rentals'],['customers','Customers'],['messages','Messages'],['cars','Fleet'],['drivers','Drivers'],['photos','Renter photos'],['settings','Settings'],['fleet','Customer view']];
+const ADM=[['bookings','Rentals'],['customers','Customers'],['messages','Messages'],['cars','Fleet'],['drivers','Drivers'],['photos','Recent activity'],['reports','Reports'],['settings','Settings'],['fleet','Customer view']];
+const ACT_VIEWS=['fleet','my-bookings','my-details'];
 const GUEST=[['fleet','Cars'],['login','Log in']];
 function navItems(){return S.session?.role==='admin'?ADM:S.session?CUST:GUEST}
 function route(){
   const items=navItems();let h=location.hash.slice(1);
   if(!items.some(i=>i[0]===h))h=items[0][0];
   S.admin=S.session?.role==='admin';
+  applyBrand();
   $('#role').textContent=!S.db?'Offline preview':S.session?(S.admin?'Admin: ':'Hi, ')+S.session.name:'';
   $('#logout').classList.toggle('hide',!S.session);
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('hide',v.id!=='v-'+h));
   const pend=allBookings().filter(b=>b.status==='pending').length;
   const unread=S.session?unreadCount():0;
+  closeMenu();
+  $('#activityBand').classList.toggle('hide',!ACT_VIEWS.includes(h));
   $('#nav').innerHTML=items.map(([k,l])=>{const n=k==='bookings'&&S.admin?pend:k==='messages'?unread:0;return `<a href="#${k}" ${k===h?'aria-current="page"':''}>${esc(l)}${n?`<span class="count" aria-label="${n} new">${n}</span>`:''}</a>`}).join('');
+  const tot=(S.admin?pend:0)+unread;$('#menuDot').textContent=tot;$('#menuDot').classList.toggle('hide',!tot);
   if(S.view!==h)scrollTo(0,0);
   S.view=h;render();
 }
 addEventListener('hashchange',route);
+function closeMenu(){$('.top').classList.remove('open');$('#menuBtn').setAttribute('aria-expanded','false');$('#menuBtn').setAttribute('aria-label','Open menu')}
+$('#menuBtn').addEventListener('click',e=>{e.stopPropagation();const o=!$('.top').classList.contains('open');$('.top').classList.toggle('open',o);$('#menuBtn').setAttribute('aria-expanded',String(o));$('#menuBtn').setAttribute('aria-label',o?'Close menu':'Open menu');if(o)$('#nav a')?.focus()});
+document.addEventListener('click',e=>{if($('.top').classList.contains('open')&&!e.target.closest('#nav')&&!e.target.closest('#menuBtn'))closeMenu()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('.top').classList.contains('open')){closeMenu();$('#menuBtn').focus()}});
+$('#nav').addEventListener('click',e=>{if(e.target.closest('a'))closeMenu()});
 
 /* ---------- ticket ---------- */
 function setRange(a,b){$('#fStart').value=toLocal(a);$('#fEnd').value=toLocal(b);ticket();renderFleet()}
@@ -157,10 +169,16 @@ function renderFleet(){
       <div class="acts">${S.admin?`<button class="btn" data-edit="${esc(c.id)}">Edit</button>`:''}<button class="btn go" data-rent="${esc(c.id)}" ${can?'':'disabled'}>Rent this car</button></div></div>
     </div></article>`}).join('');
 }
+function perView(){const v=getComputedStyle($('#strip')).getPropertyValue('--per');return Math.max(1,parseInt(v)||4)}
+function updDots(){const st=$('#strip');const n=st.querySelectorAll('.post').length;const per=perView();const pages=Math.ceil(n/per);
+  $('#stripNav').classList.toggle('hide',n<=per);
+  const w=st.clientWidth||1;const cur=Math.round(st.scrollLeft/w);
+  $('#stripDots').innerHTML=pages>1?Array.from({length:pages},(_,i)=>`<i class="${i===cur?'on':''}"></i>`).join(''):'';
+  $('#sPrev').disabled=st.scrollLeft<=4;$('#sNext').disabled=st.scrollLeft+st.clientWidth>=st.scrollWidth-4}
 function renderStrip(){
   const s=$('#strip');const g=[...S.gallery].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  s.innerHTML=g.length?g.map(p=>`<figure><img src="${esc(imgUrl(p.imageId))}" alt="${esc(p.caption||'Renter photo')}" loading="lazy">${p.caption||p.date?`<figcaption>${p.caption?`<b>${esc(p.caption)}</b>`:''}${p.date?esc(fmtD(p.date)):''}</figcaption>`:''}</figure>`).join(''):`<div class="empty" style="flex:1">${S.admin?'<b>No renter photos yet</b><a class="btn go" href="#photos">Upload photos</a>':'Photos of our renters will appear here.'}</div>`;
-  $('#stripNav').classList.toggle('hide',g.length<2);
+  s.innerHTML=g.length?g.map(p=>`<figure class="post"><button type="button" class="pic" data-post="${esc(p.id)}" aria-label="See ${esc(p.caption||'this post')} larger"><img src="${esc(imgUrl(p.imageId))}" alt="${esc(p.caption||'Recent activity photo')}" loading="lazy"></button>${p.caption||p.date||p.desc?`<figcaption>${p.caption?`<b>${esc(p.caption)}</b>`:''}${p.date?`<span class="pdate"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${esc(fmtLong(p.date))}</span>`:''}${p.desc?`<span class="pdesc">${esc(p.desc)}</span>`:''}</figcaption>`:''}</figure>`).join(''):`<div class="empty" style="flex:1">${S.admin?'<b>No posts yet</b><a class="btn go" href="#photos">Post a photo</a>':'Photos of our renters and trips will appear here.'}</div>`;
+  updDots();
 }
 
 /* ---------- render: my bookings ---------- */
@@ -218,7 +236,7 @@ function renderCars(){
 }
 function renderPhotos(){
   const g=[...S.gallery].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  $('#pGrid').innerHTML=g.length?g.map(p=>`<figure><img src="${esc(imgUrl(p.imageId))}" alt="${esc(p.caption||'Renter photo')}" loading="lazy"><figcaption><span>${esc(p.caption||'No caption')}<br><span class="small">${esc(fmtD(p.date))}</span></span><button class="btn sm danger" data-pdel="${esc(p.id)}">Delete</button></figcaption></figure>`).join(''):'<div class="empty" style="grid-column:1/-1"><b>No photos yet</b><span>Upload photos of your renters with their cars.</span></div>';
+  $('#pGrid').innerHTML=g.length?g.map(p=>`<figure><img src="${esc(imgUrl(p.imageId))}" alt="${esc(p.caption||'Recent activity photo')}" loading="lazy"><figcaption style="display:grid;gap:6px"><span><b>${esc(p.caption||'No caption')}</b><br><span class="small">${p.date?esc(fmtLong(p.date)):'No date shown'}</span>${p.desc?`<br><span class="small">${esc(p.desc.length>90?p.desc.slice(0,90)+'…':p.desc)}</span>`:''}</span><span class="acts" style="justify-content:flex-start"><button class="btn sm go" data-pedit="${esc(p.id)}">Edit</button><button class="btn sm danger" data-pdel="${esc(p.id)}">Delete</button></span></figcaption></figure>`).join(''):'<div class="empty" style="grid-column:1/-1"><b>No posts yet</b><span>Post photos of your renters and trips with a caption.</span></div>';
 }
 function renderLogin(){}
 
@@ -300,15 +318,15 @@ function customers(){
 }
 function renderCustomers(){
   const q=($('#custQ').value||'').toLowerCase();const list=customers().filter(c=>!q||[c.name,c.phone,c.email].join(' ').toLowerCase().includes(q));
-  $('#custTable tbody').innerHTML=list.map(c=>`<tr><td><b>${esc(c.name)}</b>${c.n>=3?' <span class="pill s-active">Regular</span>':''}<div class="small">${esc(c.email||'')}</div></td><td class="nw">${esc(c.phone)}</td><td>${esc(c.address)}</td><td class="num">${c.n}</td><td class="num">${esc(peso(c.spent))}</td><td class="nw">${esc(fmtD(c.last))}<div class="small">${esc(c.lastCar)}</div></td><td><div class="acts"><button class="btn sm" data-cbk="${esc(c.phone)}">Bookings</button><button class="btn sm go" data-msg="${esc(c.owner)}|${esc(c.key)}|${esc(c.name)}|${esc(c.phone)}">Message</button></div></td></tr>`).join('');
+  $('#custTable tbody').innerHTML=list.map(c=>`<tr><td><b>${esc(c.name)}</b>${c.n>=3?' <span class="pill s-active">Regular</span>':''}<div class="small">${esc(c.email||'')}</div></td><td class="nw">${esc(c.phone)}</td><td>${esc(c.address)}</td><td class="num">${c.n}</td><td class="num">${esc(peso(c.spent))}</td><td class="nw">${esc(fmtD(c.last))}<div class="small">${esc(c.lastCar)}</div></td><td><div class="acts"><button class="btn sm" data-clic="${esc(c.owner)}|${esc(c.key)}|${esc(c.name)}">License</button><button class="btn sm" data-cbk="${esc(c.phone)}">Bookings</button><button class="btn sm go" data-msg="${esc(c.owner)}|${esc(c.key)}|${esc(c.name)}|${esc(c.phone)}">Message</button></div></td></tr>`).join('');
   $('#custTable').classList.toggle('hide',!list.length);$('#custEmpty').classList.toggle('hide',list.length>0);
 }
 $('#custQ').addEventListener('input',renderCustomers);
 
 /* ---------- my details (customer) ---------- */
-const PF=[['#pName','name'],['#pPhone','phone'],['#pEmail','email'],['#pAddr','address'],['#pLic','license'],['#pEmer','emergency']];
+const PF=[['#pName','name'],['#pPhone','phone'],['#pEmail','email'],['#pAddr','address'],['#pEmer','emergency']];
 function latestMine(){return [...myItems()].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0]||{}}
-function fillDetails(){const p=latestMine();PF.forEach(([s,k])=>$(s).value=p[k]||'');detWarn()}
+function fillDetails(){const p=latestMine();PF.forEach(([s,k])=>$(s).value=p[k]||'');S.pLicNew='';setThumb('#pLicThumb','');if(p.name)licGet(S.uid,cidOf(p)).then(img=>{if(!S.pLicNew)setThumb('#pLicThumb',img||'')}).catch(()=>{});detWarn()}
 function renderDetails(){if(S.detFor!==S.session?.cid){S.detFor=S.session?.cid;$('#pMsgOk').textContent='';fillDetails()}}
 function detWarn(){const p=latestMine();const nn=$('#pName').value,ph=$('#pPhone').value;const msgs=[];
   if(norm(nn)&&norm(nn)!==norm(p.name))msgs.push('your login name will change to '+nn.trim().replace(/\s+/g,' '));
@@ -323,14 +341,14 @@ $('#detForm').addEventListener('submit',async e=>{
   if(ph.replace(/\D/g,'').length<7||!/^[+()\-\s\d]+$/.test(ph))return err('#pPhone','Enter a valid mobile number, like 0917 123 4567.');
   if(v('#pEmail')&&!/^\S+@\S+\.\S+$/.test(v('#pEmail')))return err('#pEmail','Check your email address.');
   if(!v('#pAddr'))return err('#pAddr','Enter your address.');
-  if(!v('#pLic'))return err('#pLic',"Enter your driver's license number.");
   const nk=norm(name),np=last4(ph);
   if(ownItems().some(b=>!isMine(b)&&norm(b.name)===nk&&last4(b.phone)===np))return err('#pName','Another customer on this device already uses this name and mobile number.');
-  const cid=S.session.cid||myKey();const d={name,phone:ph,email:v('#pEmail'),address:v('#pAddr'),license:v('#pLic'),emergency:v('#pEmer')};
+  const cid=S.session.cid||myKey();const d={name,phone:ph,email:v('#pEmail'),address:v('#pAddr'),emergency:v('#pEmer')};
   const items=ownItems().map(b=>isMine(b)?{...b,...d,cid}:b);
   const btn=$('#pSave');btn.disabled=true;btn.textContent='Saving…';
   try{
     await saveOwner(S.uid,items);
+    if(S.pLicNew){await licSave(S.uid,cid,S.pLicNew);S.pLicNew=''}
     if(S.chats.find(x=>x.id===S.uid)?.threads?.[cid])await writeThread('chats',S.uid,cid,x=>({...x,name,phone:ph}));
     startSession({role:'customer',name,key:nk,pass:np,cid});
     $('#pWarn').textContent='';$('#pMsgOk').textContent=`Saved. Log in next time with ${name} and password ${np}.`;route();toast('Details saved');
@@ -339,7 +357,8 @@ $('#detForm').addEventListener('submit',async e=>{
 });
 function render(){
   const v=S.view;
-  if(v==='fleet'){ticket();renderFleet();renderStrip()}
+  if(v==='fleet'){ticket();renderFleet()}
+  if(ACT_VIEWS.includes(v))renderStrip();
   if(v==='my-bookings')renderMine();
   if(v==='bookings')renderAdmin();
   if(v==='cars')renderCars();
@@ -350,6 +369,7 @@ function render(){
   if(v==='my-details')renderDetails();
   if(v==='drivers')renderDrivers();
   if(v==='settings')renderSettings();
+  if(v==='reports')renderReports();
 }
 
 /* ---------- booking wizard ---------- */
@@ -358,7 +378,9 @@ function openBooking(carId){
   $('#bkTitle').textContent='Book the '+carTitle(c);
   $('#bkCar').innerHTML=`<div class="ph">${carPic(c)}</div><div><h3>${esc(carTitle(c))}</h3><div class="small">${esc(c.type||'')} · ${esc(c.seats||'?')} seats · ${esc(c.trans||'')}</div><b style="color:var(--price)">${esc(peso(c.rate))}</b> <span class="small">per day</span></div>`;
   const mine=S.session?.role==='customer'?[...myItems()].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0]:null;
-  const p=mine||{};[['#bName','name'],['#bPhone','phone'],['#bEmail','email'],['#bAddr','address'],['#bLic','license'],['#bEmer','emergency']].forEach(([s,k])=>$(s).value=p[k]||'');
+  S.licImg='';S.licOnFile='';setThumb('#bLicThumb','');
+  if(mine)licGet(S.uid,cidOf(mine)).then(img=>{if(img&&!S.licImg){S.licOnFile=img;setThumb('#bLicThumb',img)}}).catch(()=>{});
+  const p=mine||{};[['#bName','name'],['#bPhone','phone'],['#bEmail','email'],['#bAddr','address'],['#bEmer','emergency']].forEach(([s,k])=>$(s).value=p[k]||'');
   const f=filters();$('#bStart').value=f.start;$('#bEnd').value=f.end;
   $('#bStart').min=$('#bEnd').min=toLocal(new Date());
   $('#bPick').options[1].textContent=`Deliver to my address (+${peso(SET().delivery)})`;
@@ -393,7 +415,7 @@ function stepError(n){
     if(ph.length<7||!/^[+()\-\s\d]+$/.test(v('#bPhone')))return['#bPhone','Enter a valid mobile number, like 0917 123 4567.'];
     if(v('#bEmail')&&!/^\S+@\S+\.\S+$/.test(v('#bEmail')))return['#bEmail','Check your email address.'];
     if(!v('#bAddr'))return['#bAddr','Enter your address.'];
-    if(!v('#bLic'))return['#bLic',"Enter your driver's license number."];
+    if(!S.licImg&&!S.licOnFile)return['#bLicFile',"Upload a photo of your driver's license."];
   }
   if(n===3&&!$('#bAgree').checked)return['#bAgree','Tick the box to confirm your details.'];
   return'';
@@ -406,7 +428,7 @@ function step(n){
   $('#wNext').textContent=n===3?'Send booking request':'Next';
   $('#bErr').textContent='';
   if(n===3){const v=id=>esc($(id).value.trim()||'—');const k=calc();const cb=cancelBy({start:k.s});$('#bAgreeT').textContent=`My details are correct, I'll bring my driver's license and one government ID at pickup, and I understand that I can only cancel up to ${cdTxt()} before pickup.`;$('#bPolicy').innerHTML=`<b>Cancellation policy:</b> you can cancel up to ${esc(cdTxt())} before pickup. For this booking, that's until <b>${esc(fmt(toLocal(cb)))}</b>.${+cb<=Date.now()?' Pickup is less than ${esc(cdTxt())} away, so this booking can\'t be cancelled online once sent.':''}`;
-    $('#bReview').innerHTML=`<dt>Car</dt><dd>${esc(carTitle(k.c))}</dd><dt>Pickup</dt><dd>${esc(fmt(k.s))}</dd><dt>Return</dt><dd>${esc(fmt(k.e))}</dd><dt>How you get it</dt><dd>${k.del?'Delivered to your address':'Pick up at the office'}</dd><dt>Full name</dt><dd>${v('#bName')}</dd><dt>Mobile</dt><dd>${v('#bPhone')}</dd><dt>Email</dt><dd>${v('#bEmail')}</dd><dt>Address</dt><dd>${v('#bAddr')}</dd><dt>License no.</dt><dd>${v('#bLic')}</dd><dt>Emergency contact</dt><dd>${v('#bEmer')}</dd><dt>Notes</dt><dd>${v('#bNotes')}</dd>`}
+    $('#bReview').innerHTML=`<dt>Car</dt><dd>${esc(carTitle(k.c))}</dd><dt>Pickup</dt><dd>${esc(fmt(k.s))}</dd><dt>Return</dt><dd>${esc(fmt(k.e))}</dd><dt>How you get it</dt><dd>${k.del?'Delivered to your address':'Pick up at the office'}</dd><dt>Full name</dt><dd>${v('#bName')}</dd><dt>Mobile</dt><dd>${v('#bPhone')}</dd><dt>Email</dt><dd>${v('#bEmail')}</dd><dt>Address</dt><dd>${v('#bAddr')}</dd><dt>Driver's license</dt><dd>${S.licImg||S.licOnFile?`<button type="button" class="licthumb has sm" data-zoom="b" aria-label="See your license photo larger"><img src="${esc(S.licImg||S.licOnFile)}" alt="Driver's license"></button>`:'—'}</dd><dt>Emergency contact</dt><dd>${v('#bEmer')}</dd><dt>Notes</dt><dd>${v('#bNotes')}</dd>`}
   updSum();
   $('#dBook .db').scrollTop=0;$('#dBook').scrollTop=0;
 }
@@ -421,9 +443,10 @@ $('#bookForm').addEventListener('submit',async e=>{
   if(clashes(k.c.id,k.s,k.e).length){step(1);$('#bErr').textContent='Someone just booked this car on those dates. Choose other dates.';return}
   const btn=$('#wNext');btn.disabled=true;btn.textContent='Sending…';
   const nm=v('#bName').replace(/\s+/g,' ');const prev=ownItems().find(x=>norm(x.name)===norm(nm)&&last4(x.phone)===last4(v('#bPhone')));
-  const b={id:uid(),ref:ref(),cid:S.session?.role==='customer'&&isMine({name:nm,phone:v('#bPhone')})?S.session.cid:prev?cidOf(prev):tk(norm(nm),last4(v('#bPhone'))),carId:k.c.id,carName:carTitle(k.c),plate:k.c.plate||'',name:v('#bName').replace(/\s+/g,' '),phone:v('#bPhone'),email:v('#bEmail'),address:v('#bAddr'),license:v('#bLic'),emergency:v('#bEmer'),start:k.s,end:k.e,days:k.n,rate:+k.c.rate,extras:k.ex.map(x=>x.label),extrasDetail:k.ex.map(x=>({label:x.label,perDay:+x.perDay||0,driver:!!x.driver})),extrasPerDay:k.exDay,pickup:$('#bPick').value,delivery:k.del,total:k.total,deposit:+k.c.deposit||0,notes:v('#bNotes'),status:'pending',createdAt:Date.now()};
+  const b={id:uid(),ref:ref(),cid:S.session?.role==='customer'&&isMine({name:nm,phone:v('#bPhone')})?S.session.cid:prev?cidOf(prev):tk(norm(nm),last4(v('#bPhone'))),carId:k.c.id,carName:carTitle(k.c),plate:k.c.plate||'',name:v('#bName').replace(/\s+/g,' '),phone:v('#bPhone'),email:v('#bEmail'),address:v('#bAddr'),hasLicense:true,emergency:v('#bEmer'),start:k.s,end:k.e,days:k.n,rate:+k.c.rate,extras:k.ex.map(x=>x.label),extrasDetail:k.ex.map(x=>({label:x.label,perDay:+x.perDay||0,driver:!!x.driver})),extrasPerDay:k.exDay,pickup:$('#bPick').value,delivery:k.del,total:k.total,deposit:+k.c.deposit||0,notes:v('#bNotes'),status:'pending',createdAt:Date.now()};
   try{
-    if(S.server){const r=await S.db.book({...b,tz:new Date().getTimezoneOffset()});Object.assign(b,r.booking)}else await saveOwner(S.uid,[...ownItems(),b]);
+    if(S.server){const r=await S.db.book({...b,tz:new Date().getTimezoneOffset(),licenseImg:S.licImg||''});Object.assign(b,r.booking)}
+    else{if(S.licImg)await licSave(S.uid,b.cid,S.licImg);await saveOwner(S.uid,[...ownItems(),b])}
     $('#dBook').close();
     if(S.session?.role==='admin'){toast('Booking '+b.ref+' added');return}
     if(!isMine(b)){
@@ -462,7 +485,7 @@ function openDetail(owner,id){
   $('#detT').textContent='Booking '+b.ref;
   $('#detBody').innerHTML=`<div class="mini"><div class="ph">${carPic(c||{name:b.carName})}</div><div><h3>${esc(b.carName)}</h3><div class="small">${esc(c?.plate||b.plate||'')}</div><span class="pill s-${esc(b.status)}">${esc(STS[b.status])}</span></div></div>
   ${clash.length?`<p class="note">Overlaps an approved booking for this car, ${esc(fmt(clash[0].start))} to ${esc(fmt(clash[0].end))}.</p>`:''}
-  <dl class="kv"><dt>Full name</dt><dd>${esc(b.name)}</dd><dt>Mobile</dt><dd>${esc(b.phone)}</dd><dt>Email</dt><dd>${esc(b.email||'—')}</dd><dt>Address</dt><dd>${esc(b.address)}</dd><dt>License no.</dt><dd>${esc(b.license)}</dd><dt>Emergency contact</dt><dd>${esc(b.emergency||'—')}</dd>
+  <dl class="kv"><dt>Full name</dt><dd>${esc(b.name)}</dd><dt>Mobile</dt><dd>${esc(b.phone)}</dd><dt>Email</dt><dd>${esc(b.email||'—')}</dd><dt>Address</dt><dd>${esc(b.address)}</dd><dt>Driver's license</dt><dd id="detLic"><span class="small">Loading photo…</span></dd><dt>Emergency contact</dt><dd>${esc(b.emergency||'—')}</dd>
   <dt>Pickup</dt><dd>${esc(fmt(b.start))}</dd><dt>Return</dt><dd>${esc(fmt(b.end))} (${plural(+b.days||0,'day')})</dd><dt>How they get it</dt><dd>${b.pickup==='delivery'?'Deliver to address':'At the office'}</dd><dt>Extras</dt><dd>${esc((b.extras||[]).join(', ')||'None')}</dd>${needsDriver(b)?`<dt>Driver</dt><dd>${b.driverName?`<b>${esc(b.driverName)}</b>, ${esc(b.driverPhone||'')}`:'<span class="err">Needs a driver. Assign one below.</span>'}</dd>`:''}
   <dt>Total</dt><dd><b>${esc(peso(b.total))}</b> (${esc(peso(b.rate))} a day${b.extrasPerDay?` + ${esc(peso(b.extrasPerDay))} a day extras`:''}${b.delivery?` + ${esc(peso(b.delivery))} delivery`:''})</dd><dt>Deposit</dt><dd>${esc(peso(b.deposit))}</dd><dt>Customer notes</dt><dd>${esc(b.notes||'—')}</dd><dt>Requested</dt><dd>${esc(b.createdAt?new Date(b.createdAt).toLocaleString('en-PH'):'—')}</dd>${(b.changes||[]).length?`<dt>Changes</dt><dd>${b.changes.map(c=>`<div><b>${esc(tAt(c.at))}:</b> ${esc(c.what)}</div>`).join('')}</dd>`:''}</dl>
   ${needsDriver(b)&&!['rejected','cancelled','completed'].includes(b.status)?`<div><label for="detDrv">Driver for this trip</label><div class="acts" style="justify-content:flex-start;flex-wrap:nowrap"><select id="detDrv" style="flex:1">${driverOpts(b.start,b.end,b.id,b.driverId)}</select><button class="btn" data-act="drv">${b.driverId?'Change driver':'Assign driver'}</button></div>${S.drivers.length?'':'<p class="hint">No drivers yet. Add them on the Drivers page.</p>'}</div>`:''}
@@ -470,6 +493,7 @@ function openDetail(owner,id){
   <button class="btn" data-msg="${esc(owner)}|${esc(cidOf(b))}|${esc(b.name)}|${esc(b.phone)}" data-draft="About booking ${esc(b.ref)}: ">Send ${esc(b.name.split(' ')[0])} a message</button>`;
   const A={pending:[['edit','Change booking',''],['rejected','Reject','danger'],['approved','Approve','okb']],approved:[['edit','Change booking',''],['cancelled','Cancel booking','danger'],['active','Mark picked up','go']],active:[['edit','Change booking',''],['completed','Mark returned','go']],completed:[],rejected:[['pending','Reopen','']],cancelled:[['pending','Reopen','']]}[b.status]||[];
   $('#detActs').innerHTML=`<button class="btn ghost danger" data-act="delete">Delete</button><button class="btn ghost" data-act="copy">Copy details</button><span style="flex:1"></span><button class="btn" data-act="note">Save comment</button>${A.map(([s,l,k])=>`<button class="btn ${k}" data-act="${s}">${l}</button>`).join('')}`;
+  licGet(owner,cidOf(b)).then(img=>{const el=$('#detLic');if(!el)return;el.innerHTML=img?`<button type="button" class="licthumb has sm" data-zoomsrc="1" aria-label="See the license photo larger"><img src="${esc(img)}" alt="Driver's license of ${esc(b.name)}"></button>`:`<span class="small">No photo uploaded${b.license?`. License no. ${esc(b.license)}`:''}</span>`}).catch(()=>{const el=$('#detLic');if(el)el.innerHTML='<span class="err">The photo could not be loaded.</span>'});
   $('#detBody').onclick=e=>{if(e.target.closest('[data-act]'))$('#detActs').onclick(e)};
   if($('#detDrv'))$('#detDrv').value=b.driverId||'';
   $('#detActs').onclick=async e=>{
@@ -537,7 +561,9 @@ function renderSettings(){
   if(S.setDirty)return;const st=SET();
   S.setEx=st.extras.map(x=>({...x}));drawExRows();
   $('#setDel').value=st.delivery;$('#setCancel').value=st.cancelDays;$('#setMsg').textContent='';
+  $('#setName').value=st.siteName;S.setLogo=null;S.setLogoDrop=false;S.setLogoId=st.logoId;drawLogoPrev();
 }
+function drawLogoPrev(){const src=S.setLogo?S.setLogoUrl:(!S.setLogoDrop&&S.setLogoId?imgUrl(S.setLogoId):'');$('#setLogoPrev').innerHTML=src?`<img src="${esc(src)}" alt="Logo preview">`:'<svg width="48" height="31" viewBox="0 0 34 22" style="color:#fff"><use href="#i-car"/></svg>';$('#setLogoDel').classList.toggle('hide',!src)}
 function drawExRows(){
   $('#exRows').innerHTML=S.setEx.length?S.setEx.map((x,i)=>`<div class="exrow"><input aria-label="Extra name" data-exl="${i}" value="${esc(x.label)}" placeholder="e.g. Car phone holder"><div class="rateedit"><span class="small">₱</span><input aria-label="Price per day" type="number" min="0" step="50" data-exp="${i}" value="${esc(x.perDay)}"><span class="small nw">a day</span></div><label class="check" style="margin:0"><input type="checkbox" data-exd="${i}" ${x.driver?'checked':''}>Includes a driver</label><button type="button" class="btn sm danger" data-exx="${i}">Remove</button></div>`).join(''):'<p class="small">No extras. Customers won\'t see any extras when booking.</p>';
 }
@@ -558,9 +584,170 @@ $('#setSave').addEventListener('click',async()=>{
   const del=+$('#setDel').value,cd=+$('#setCancel').value;
   if(!(del>=0)){msg.textContent='Enter a delivery fee of 0 or more.';return}
   if(!(cd>=0&&cd<=60&&Number.isInteger(cd))){msg.textContent='Enter cancellation days as a whole number from 0 to 60.';return}
-  const b=$('#setSave');b.disabled=true;
-  try{await serial('set',()=>S.db.doc('settings/main').set({extras:ex,delivery:del,cancelDays:cd,updatedAt:Date.now()}));S.settings={extras:ex,delivery:del,cancelDays:cd};S.setDirty=false;renderSettings();toast('Settings saved. Customers see the new prices now.')}
-  catch(x){msg.textContent='Not saved. Try again.'}finally{b.disabled=false}
+  const siteName=$('#setName').value.trim().replace(/\s+/g,' ');
+  if(!siteName){msg.textContent='Enter a website name.';$('#setName').focus();return}
+  if(S.setLogo&&!S.assets){msg.textContent='Only the admin can upload a logo.';return}
+  const b=$('#setSave');b.disabled=true;const oldLogo=SET().logoId;
+  try{
+    let logoId=S.setLogoDrop?'':oldLogo;
+    if(S.setLogo){try{logoId=(await S.assets.upload(S.setLogo)).id}catch(x){msg.textContent='The logo was not uploaded: '+(x?.message||'try a smaller picture.');return}}
+    const data={...(S.settings||{}),extras:ex,delivery:del,cancelDays:cd,siteName,logoId,updatedAt:Date.now()};
+    await serial('set',()=>S.db.doc('settings/main').set(data));
+    if(oldLogo&&oldLogo!==logoId&&S.assets)S.assets.delete(oldLogo).catch(()=>{});
+    S.settings=data;S.setDirty=false;renderSettings();route();toast('Settings saved. Everyone sees the changes now.')}
+  catch(x){msg.textContent='Not saved. '+(x?.message||'Try again.')}finally{b.disabled=false}
+});
+
+/* ---------- pictures: license photos, logo, zoom ---------- */
+function setThumb(sel,img){const t=$(sel);if(!t)return;t.classList.toggle('has',!!img);t.innerHTML=img?`<img src="${esc(img)}" alt="Driver's license">`:'No photo yet';t.dataset.src=img||''}
+function openZoom(src,title,desc,date){$('#zDesc').textContent=desc||'';$('#zDate').textContent=date||'';$('#zT').textContent=title||"Driver's license";$('#zImg').src=src;$('#zImg').alt=title||"Driver's license";$('#zBody').classList.remove('big');$('#dZoom').showModal()}
+$('#zImg').addEventListener('click',()=>$('#zBody').classList.toggle('big'));
+async function photoToDataUrl(file){
+  if(!file)throw{message:'Choose a photo.'};
+  if(!/^image\//.test(file.type||''))throw{message:"That file isn't a picture. Choose a JPG or PNG photo."};
+  if(file.size>25*1024*1024)throw{message:'That photo is too large. Choose one under 25 MB.'};
+  let bmp;try{bmp=await createImageBitmap(file)}catch(e){throw{message:"That picture can't be opened. Take the photo again or choose a JPG or PNG."}}
+  for(const [mx,q] of [[1400,.82],[1200,.75],[1000,.7],[800,.65],[640,.6]]){
+    const s=Math.min(1,mx/Math.max(bmp.width,bmp.height));const cv=document.createElement('canvas');cv.width=Math.round(bmp.width*s);cv.height=Math.round(bmp.height*s);
+    const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,cv.width,cv.height);g.drawImage(bmp,0,0,cv.width,cv.height);
+    const url=cv.toDataURL('image/jpeg',q);if(url.length<240000)return url;
+  }
+  throw{message:'That photo is too detailed to send. Take it again a little further away.'};
+}
+async function logoBlob(file){
+  if(!/^image\//.test(file?.type||''))throw{message:"That file isn't a picture. Choose a PNG or JPG logo."};
+  if(file.size>10*1024*1024)throw{message:'That logo is too large. Choose one under 10 MB.'};
+  let bmp;try{bmp=await createImageBitmap(file)}catch(e){throw{message:"That picture can't be opened. Try a PNG or JPG."}}
+  const s=Math.min(1,320/bmp.height,800/bmp.width);const cv=document.createElement('canvas');cv.width=Math.round(bmp.width*s);cv.height=Math.round(bmp.height*s);cv.getContext('2d').drawImage(bmp,0,0,cv.width,cv.height);
+  return await new Promise((res,rej)=>cv.toBlob(b=>b?res(b):rej({message:'The logo could not be prepared.'}),'image/png'));
+}
+/* license photos are private: only the admin and that customer can open them */
+async function licSave(owner,cid,img){
+  if(S.server){await S.db.api('api/license-set',{method:'POST',body:JSON.stringify({owner,img})});}
+  else if(S.local){try{localStorage.setItem('cr-lic-'+cid,img)}catch(e){throw{message:'Browser storage is full. Delete some photos.'}}}
+  else await S.db.doc(`licenses/${owner}/files/${cid}`).set({img,updatedAt:Date.now()});
+  S.licCache[owner+'|'+cid]=img;
+}
+async function licGet(owner,cid){
+  const k=owner+'|'+cid;if(S.licCache[k])return S.licCache[k];let img='';
+  if(S.server)img=(await S.db.api('api/license-get',{method:'POST',body:JSON.stringify({owner})})).img||'';
+  else if(S.local){try{img=localStorage.getItem('cr-lic-'+cid)||''}catch(e){}}
+  else{const d=await S.db.doc(`licenses/${owner}/files/${cid}`).get();img=d.exists?(d.data().img||''):''}
+  if(img)S.licCache[k]=img;return img;
+}
+function applyBrand(){
+  const st=SET();$('#brandName').textContent=st.siteName;
+  const src=st.logoId?imgUrl(st.logoId):'';
+  if(S.brandSrc!==src){S.brandSrc=src;$('#brandLogo').innerHTML=src?`<img src="${esc(src)}" alt="">`:'<svg width="34" height="22" style="color:#fff"><use href="#i-car"/></svg>';
+    let ic=document.querySelector('link[rel=icon]');if(src){if(!ic){ic=document.createElement('link');ic.rel='icon';document.head.appendChild(ic)}ic.href=src}else if(ic)ic.remove()}
+  if(document.title!==st.siteName)document.title=st.siteName;
+}
+$('#bLicFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;$('#bErr').textContent='';
+  try{S.licImg=await photoToDataUrl(f);setThumb('#bLicThumb',S.licImg)}catch(x){$('#bErr').textContent=x.message||'The photo could not be used.'}});
+$('#pLicFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;$('#pErr').textContent='';
+  try{S.pLicNew=await photoToDataUrl(f);setThumb('#pLicThumb',S.pLicNew);$('#pMsgOk').textContent='';$('#pWarn').textContent=($('#pWarn').textContent?$('#pWarn').textContent+' ':'')+'Click Save changes to keep the new license photo.'}catch(x){$('#pErr').textContent=x.message||'The photo could not be used.'}});
+$('#setLogoFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;$('#setMsg').textContent='';
+  try{S.setLogo=await logoBlob(f);if(S.setLogoUrl)URL.revokeObjectURL(S.setLogoUrl);S.setLogoUrl=URL.createObjectURL(S.setLogo);S.setLogoDrop=false;S.setDirty=true;drawLogoPrev()}catch(x){$('#setMsg').textContent=x.message||'The logo could not be used.'}});
+$('#setLogoDel').addEventListener('click',()=>{S.setLogo=null;S.setLogoDrop=true;S.setDirty=true;drawLogoPrev()});
+document.addEventListener('click',e=>{
+  const t=e.target.closest('.licthumb.has');if(t){const img=t.querySelector('img');if(img)openZoom(img.src,img.alt||"Driver's license");return}
+});
+
+/* ---------- reports (admin) ---------- */
+const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+function repRange(q){const t=new Date();t.setHours(0,0,0,0);let a=new Date(t),b=new Date(t);
+  if(q==='week'){const dow=(t.getDay()+6)%7;a.setDate(t.getDate()-dow);b=new Date(a);b.setDate(a.getDate()+6)}
+  else if(q==='month'){a=new Date(t.getFullYear(),t.getMonth(),1);b=new Date(t.getFullYear(),t.getMonth()+1,0)}
+  else if(q==='lastmonth'){a=new Date(t.getFullYear(),t.getMonth()-1,1);b=new Date(t.getFullYear(),t.getMonth(),0)}
+  else if(q==='year'){a=new Date(t.getFullYear(),0,1);b=new Date(t.getFullYear(),11,31)}
+  else if(q==='all')return['',''];
+  return[ymd(a),ymd(b)]}
+function repSetQuick(q){const[a,b]=repRange(q);$('#repFrom').value=a;$('#repTo').value=b;S.repQuick=q;renderReports()}
+function repFilters(){return{from:$('#repFrom').value,to:$('#repTo').value,by:$('#repBy').value,q:$('#repQ').value.trim().toLowerCase(),car:$('#repCar').value,drv:$('#repDrv').value,pick:$('#repPick').value}}
+const EARNED=['approved','active','completed'];
+function repSplit(){const rows=repRows();return{earned:rows.filter(b=>EARNED.includes(b.status)),pending:rows.filter(b=>b.status==='pending'),lost:rows.filter(b=>['cancelled','rejected'].includes(b.status))}}
+function repByCar(rows){const m=new Map();rows.forEach(b=>{const k=b.carId||b.carName;const c=m.get(k)||{car:b.carName,plate:b.plate||carById(b.carId)?.plate||'',n:0,days:0,total:0};c.n++;c.days+=+b.days||0;c.total+=+b.total||0;m.set(k,c)});return[...m.values()].sort((a,b)=>b.total-a.total)}
+function repRows(){const f=repFilters();
+  return allBookings().filter(b=>{
+    const d=f.by==='created'?(b.createdAt?ymd(new Date(b.createdAt)):''):String(b.start||'').slice(0,10);
+    if(f.from&&d<f.from)return false;if(f.to&&d>f.to)return false;
+    if(f.q&&![b.name,b.phone,b.email,b.ref].join(' ').toLowerCase().includes(f.q))return false;
+    if(f.car&&b.carId!==f.car)return false;
+    if(f.drv==='with'&&!needsDriver(b))return false;if(f.drv==='without'&&needsDriver(b))return false;if(f.drv&&!['with','without'].includes(f.drv)&&b.driverId!==f.drv)return false;
+    if(f.pick&&(b.pickup||'office')!==f.pick)return false;return true})
+  .sort((x,y)=>String(f.by==='created'?y.createdAt:y.start).localeCompare(String(f.by==='created'?x.createdAt:x.start),undefined,{numeric:true}))}
+function renderReports(){
+  if(!$('#repCar').dataset.v||$('#repCar').dataset.v!==String(S.cars.length)){const cur=$('#repCar').value;$('#repCar').innerHTML='<option value="">All cars</option>'+[...S.cars].sort((a,b)=>carTitle(a).localeCompare(carTitle(b))).map(c=>`<option value="${esc(c.id)}">${esc(carTitle(c))}${c.plate?' · '+esc(c.plate):''}</option>`).join('');$('#repCar').value=cur;$('#repCar').dataset.v=String(S.cars.length)}
+  {const cur=$('#repDrv').value;$('#repDrv').innerHTML='<option value="">Any</option><option value="with">Booked with a driver</option><option value="without">Without a driver</option>'+S.drivers.map(d=>`<option value="${esc(d.id)}">Driver: ${esc(d.name)}</option>`).join('');$('#repDrv').value=cur}
+  if(S.repQuick===undefined){repSetQuick('month');return}
+  document.querySelectorAll('#repQuick [data-rq]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.rq===S.repQuick)));
+  const R=repSplit();const sumE=R.earned.reduce((a,b)=>a+(+b.total||0),0),sumP=R.pending.reduce((a,b)=>a+(+b.total||0),0),sumL=R.lost.reduce((a,b)=>a+(+b.total||0),0);
+  const daysR=R.earned.reduce((a,b)=>a+(+b.days||0),0);
+  $('#repSum').innerHTML=[[peso(sumE),'total earned',1],[R.earned.length,'rentals'],[daysR,'days rented'],[R.earned.length?peso(sumE/R.earned.length):'₱0','average per rental'],[`${R.pending.length} · ${peso(sumP)}`,'pending requests'],[`${R.lost.length} · ${peso(sumL)}`,'cancelled or rejected']].map(([v,l,h])=>`<div class="stat${h?' hot':''}"><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join('');
+  const f=repFilters();const all=R.earned.length+R.pending.length+R.lost.length;
+  $('#repLine').textContent=`${plural(all,'transaction')}${f.from||f.to?`, ${f.by==='created'?'booked':'picking up'} ${f.from?fmtLong(f.from):'any time'} to ${f.to?fmtLong(f.to):'now'}`:', all time'}${f.q?`, customer matching "${$('#repQ').value.trim()}"`:''}.`;
+  $('#repJump').innerHTML=[['rs-earned','Rentals and earnings',R.earned.length],['rs-pending','Pending',R.pending.length],['rs-lost','Cancelled and rejected',R.lost.length]].map(([id,l,n])=>`<a class="chip" href="#${id}" data-jump="${id}" style="text-decoration:none">${l} ${n}</a>`).join('');
+  const row=(b,extra)=>`<tr class="click" data-bk="${esc(b.owner)}|${esc(b.id)}" tabindex="0"><td><b>${esc(b.ref)}</b></td><td>${esc(b.createdAt?fmtD(ymd(new Date(b.createdAt))):'—')}</td><td>${esc(b.name)}<div class="small">${esc(b.phone)}</div></td><td>${esc(b.carName)}</td><td>${esc(fmt(b.start))}</td><td>${esc(fmt(b.end))}</td><td class="num">${esc(b.days)}</td><td class="num">${esc(peso(b.total))}</td>${extra(b)}</tr>`;
+  const table=(id,title,note,rows,extraHead,extra,footLabel)=>`<section class="rsec" id="${id}"><h2>${title} <span>${plural(rows.length,'booking')} · ${esc(peso(rows.reduce((a,b)=>a+(+b.total||0),0)))}</span></h2><p class="small" style="margin:0 0 8px">${note}</p>${rows.length?`<div class="scroll"><table class="stack rtab"><thead><tr><th>Ref</th><th>Booked</th><th>Customer</th><th>Car</th><th>Pickup</th><th>Return</th><th class="num">Days</th><th class="num">Total</th>${extraHead}</tr></thead><tbody>${rows.map(b=>row(b,extra)).join('')}</tbody><tfoot><tr><td colspan="6">${footLabel}</td><td class="num">${rows.reduce((a,b)=>a+(+b.days||0),0)}</td><td class="num">${esc(peso(rows.reduce((a,b)=>a+(+b.total||0),0)))}</td>${extraHead.split('<th').length>1?'<td colspan="'+(extraHead.split('<th').length-1)+'"></td>':''}</tr></tfoot></table></div>`:'<div class="empty">None for these filters.</div>'}</section>`;
+  const byCar=repByCar(R.earned);
+  const carTable=byCar.length?`<div class="scroll" style="margin-bottom:14px"><table class="stack rtab"><caption>Earnings by car</caption><thead><tr><th>Car</th><th>Plate</th><th class="num">Times rented</th><th class="num">Days</th><th class="num">Earned</th></tr></thead><tbody>${byCar.map(c=>`<tr><td>${esc(c.car)}</td><td>${esc(c.plate)}</td><td class="num">${c.n}</td><td class="num">${c.days}</td><td class="num">${esc(peso(c.total))}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="2">TOTAL</td><td class="num">${R.earned.length}</td><td class="num">${daysR}</td><td class="num">${esc(peso(sumE))}</td></tr></tfoot></table></div>`:'';
+  $('#repSections').innerHTML=
+    table('rs-earned','Rentals and earnings','Approved, picked up and returned bookings. This is the money earned.',R.earned,'<th>Status</th><th>Driver</th>',b=>`<td><span class="pill s-${esc(b.status)}">${esc(STS[b.status])}</span></td><td>${needsDriver(b)?esc(b.driverName||'Not assigned'):'—'}</td>`,'TOTAL EARNED').replace('</p>','</p>'+carTable)+
+    table('rs-pending','Pending','Requests waiting for your answer. Total is what they would earn if approved.',R.pending,'<th>Waiting since</th>',b=>`<td>${esc(b.createdAt?new Date(b.createdAt).toLocaleString('en-PH',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'—')}</td>`,'TOTAL PENDING')+
+    table('rs-lost','Cancelled and rejected','Bookings that did not go ahead. Total is the value lost.',R.lost,'<th>Status</th><th>Comment from office</th>',b=>`<td><span class="pill s-${esc(b.status)}">${esc(STS[b.status])}</span></td><td class="wrapc">${esc(b.adminNote||'—')}</td>`,'TOTAL LOST');
+  $('#repXlsx').textContent=`Download Excel (${all})`;$('#repXlsx').disabled=!all;
+}
+$('#repFilters').addEventListener('input',e=>{if(['repFrom','repTo'].includes(e.target.id))S.repQuick='custom';renderReports()});
+$('#repFilters').addEventListener('change',()=>renderReports());
+$('#repJump').addEventListener('click',e=>{const a=e.target.closest('[data-jump]');if(a){e.preventDefault();document.getElementById(a.dataset.jump)?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}});
+$('#repQuick').addEventListener('click',e=>{const q=e.target.closest('[data-rq]')?.dataset.rq;if(q)repSetQuick(q)});
+$('#repClear').addEventListener('click',()=>{['#repQ','#repCar','#repDrv','#repPick'].forEach(s=>$(s).value='');$('#repBy').value='start';repSetQuick('all')});
+
+/* --- a small built-in Excel (.xlsx) writer: no internet needed --- */
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+const crc32=u=>{let c=0xFFFFFFFF;for(let i=0;i<u.length;i++)c=CRC[(c^u[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0};
+function zip(files){const enc=new TextEncoder();const parts=[],cen=[];let off=0;
+  for(const[name,text]of files){const nb=enc.encode(name),data=enc.encode(text),crc=crc32(data);
+    const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,0,true);h.setUint16(12,0x21,true);h.setUint32(14,crc,true);h.setUint32(18,data.length,true);h.setUint32(22,data.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+    parts.push(new Uint8Array(h.buffer),nb,data);
+    const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,0,true);c.setUint16(14,0x21,true);c.setUint32(16,crc,true);c.setUint32(20,data.length,true);c.setUint32(24,data.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+    cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+data.length}
+  const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...cen,new Uint8Array(e.buffer)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})}
+const xe=v=>String(v??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const colL=i=>{let s='';i++;while(i){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26)}return s};
+function sheetXml(rows,widths,money){
+  const body=rows.map((r,ri)=>`<row r="${ri+1}">${r.map((v,ci)=>{const ref=colL(ci)+(ri+1);if(v&&typeof v==='object'&&ri>0){if('money' in v)return`<c r="${ref}" s="${v.bold?3:2}"><v>${+v.money||0}</v></c>`;if('num' in v)return`<c r="${ref}" s="${v.bold?4:0}"><v>${+v.num||0}</v></c>`;return`<c r="${ref}" t="inlineStr" s="${v.bold?1:0}"><is><t xml:space="preserve">${xe(v.text)}</t></is></c>`}if(typeof v==='number'&&ri>0)return`<c r="${ref}"${money.includes(ci)?' s="2"':''}><v>${v}</v></c>`;return`<c r="${ref}" t="inlineStr"${ri===0?' s="1"':''}><is><t xml:space="preserve">${xe(v)}</t></is></c>`}).join('')}</row>`).join('');
+  return`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${body}</sheetData></worksheet>`}
+function makeXlsx(sheets){
+  const ws=sheets.map(s=>s.name);
+  const files=[['[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${ws.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`],
+    ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+    ['xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${ws.map((n,i)=>`<sheet name="${xe(n)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets></workbook>`],
+    ['xl/_rels/workbook.xml.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${ws.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}<Relationship Id="rId${ws.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ['xl/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;₱&quot;#,##0"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyNumberFormat="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'],
+    ...sheets.map((s,i)=>[`xl/worksheets/sheet${i+1}.xml`,sheetXml(s.rows,s.widths,s.money||[])])];
+  return zip(files)}
+async function saveFile(blob,filename){
+  if(window.claude?.use){const dl=await window.claude.use('downloads');if(!dl)throw{message:'Downloads are not available here. Open the page in a browser.'};await dl.save({filename,data:blob});return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000)}
+$('#repXlsx').addEventListener('click',async()=>{
+  const R=repSplit();const all=R.earned.length+R.pending.length+R.lost.length;if(!all)return;$('#repErr').textContent='';
+  const t=(x)=>x?fmt(x):'';
+  const head=['Reference','Date booked','Customer','Mobile','Email','Address','Car','Plate','Pickup','Return','Days','Price per day','Extras','Extras per day','How they get the car','Delivery fee','Total','Deposit','Status','Driver','Driver mobile','Customer notes','Comment from office','Changes'];
+  const rowOf=b=>[b.ref,b.createdAt?new Date(b.createdAt).toLocaleString('en-PH'):'',b.name,b.phone,b.email||'',b.address||'',b.carName,b.plate||carById(b.carId)?.plate||'',t(b.start),t(b.end),+b.days||0,+b.rate||0,(b.extras||[]).join(', '),+b.extrasPerDay||0,b.pickup==='delivery'?'Delivered':'Office pickup',+b.delivery||0,+b.total||0,+b.deposit||0,STS[b.status]||b.status,needsDriver(b)?(b.driverName||'Not assigned'):'',b.driverPhone||'',b.notes||'',b.adminNote||'',(b.changes||[]).map(c=>c.what).join(' | ')];
+  const totalRow=(label,rows)=>{const r=head.map(()=>'');r[0]={text:label,bold:true};r[10]={num:rows.reduce((a,b)=>a+(+b.days||0),0),bold:true};r[15]={money:rows.reduce((a,b)=>a+(+b.delivery||0),0),bold:true};r[16]={money:rows.reduce((a,b)=>a+(+b.total||0),0),bold:true};return r};
+  const W=[12,20,22,15,24,30,22,11,22,22,7,13,28,13,16,12,12,12,13,18,15,30,30,40],M=[11,13,15,16,17];
+  const sheet=(name,rows,label)=>({name,rows:[head,...rows.map(rowOf),...(rows.length?[totalRow(label,rows)]:[[{text:'None for these filters'}]])],widths:W,money:M});
+  const f=repFilters();const sumE=R.earned.reduce((a,b)=>a+(+b.total||0),0);const sel=id=>$(id).selectedOptions[0]?.textContent||'';
+  const summary=[['Item','Value'],['Report from',SET().siteName],['Downloaded',new Date().toLocaleString('en-PH')],['Dates',f.from||f.to?`${f.from||'any'} to ${f.to||'any'} (${sel('#repBy')})`:'All time'],['Customer search',$('#repQ').value.trim()||'Everyone'],['Car',sel('#repCar')],['Driver',sel('#repDrv')],['How they get the car',sel('#repPick')],['',''],
+    [{text:'TOTAL EARNED',bold:true},{money:sumE,bold:true}],['Rentals (approved, picked up, returned)',R.earned.length],['Days rented',R.earned.reduce((a,b)=>a+(+b.days||0),0)],['Average per rental',{money:R.earned.length?Math.round(sumE/R.earned.length):0}],
+    ['Pending requests',R.pending.length],['Pending value',{money:R.pending.reduce((a,b)=>a+(+b.total||0),0)}],['Cancelled or rejected',R.lost.length],['Value lost',{money:R.lost.reduce((a,b)=>a+(+b.total||0),0)}]];
+  const byCar=repByCar(R.earned);
+  const carRows=[['Car','Plate','Times rented','Days','Earned'],...byCar.map(c=>[c.car,c.plate,c.n,c.days,{money:c.total}]),...(byCar.length?[[{text:'TOTAL',bold:true},'',{num:R.earned.length,bold:true},{num:R.earned.reduce((a,b)=>a+(+b.days||0),0),bold:true},{money:sumE,bold:true}]]:[])];
+  const blob=makeXlsx([{name:'Summary',rows:summary,widths:[38,44]},sheet('Rentals and earnings',R.earned,'TOTAL EARNED'),{name:'Earnings by car',rows:carRows,widths:[26,12,14,8,14]},sheet('Pending',R.pending,'TOTAL PENDING'),sheet('Cancelled and rejected',R.lost,'TOTAL LOST')]);
+  const name=`${SET().siteName} report ${f.from||'all'}${f.to?' to '+f.to:''}`.replace(/[\\/:*?"<>|]+/g,'-').slice(0,120)+'.xlsx';
+  try{await saveFile(blob,name);toast('Excel file ready: '+name)}catch(x){if(x?.code!=='declined')$('#repErr').textContent=x?.message||'The file could not be saved.'}
 });
 
 /* ---------- change booking (admin) ---------- */
@@ -661,11 +848,32 @@ dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');tr
 $('#pUp').addEventListener('click',async()=>{
   const files=[...$('#pFiles').files];const msg=$('#pMsg');
   if(!S.assets){msg.textContent='Uploading needs Editor access to this page.';return}
-  if(!files.length){msg.textContent='Choose at least one photo.';return}
+  if(!files.length){msg.textContent='Choose at least one photo to post.';return}
+  if($('#pDate').value&&$('#pDate').value>toLocal(new Date()).slice(0,10)){msg.textContent="The date rented can't be in the future.";return}
   const btn=$('#pUp');btn.disabled=true;let ok=0;
   for(const f of files){msg.textContent=`Uploading ${ok+1} of ${files.length}…`;
-    try{const up=await S.assets.upload(await shrink(f));const id='p-'+uid();await S.db.doc('gallery/'+id).set({imageId:up.id,caption:$('#pCap').value.trim(),date:toLocal(new Date()),createdAt:Date.now()});ok++}catch(x){msg.textContent='A photo was not uploaded: '+(x?.message||'error')}}
-  btn.disabled=false;$('#pFiles').value='';$('#pCap').value='';msg.textContent=`${plural(ok,'photo')} uploaded.`;
+    if(!/^image\//.test(f.type||'')){msg.textContent=`${f.name} isn't a picture. Choose JPG or PNG photos.`;continue}
+    try{const up=await S.assets.upload(await shrink(f));const id='p-'+uid();await S.db.doc('gallery/'+id).set({imageId:up.id,caption:$('#pCap').value.trim(),desc:$('#pDesc').value.trim(),date:$('#pDate').value||'',createdAt:Date.now()});ok++}catch(x){msg.textContent='A photo was not posted: '+(x?.message||'error')}}
+  btn.disabled=false;if(ok){$('#pFiles').value='';$('#pCap').value='';$('#pDesc').value='';$('#pDate').value='';msg.textContent=`${plural(ok,'photo')} posted. Customers can see ${ok===1?'it':'them'} in Recent activity.`}
+});
+
+/* ---------- edit a recent activity post ---------- */
+function openPost(id){const p=S.gallery.find(x=>x.id===id);if(!p)return;S.post=p;S.postImg=null;
+  $('#poPrev').innerHTML=`<img src="${esc(imgUrl(p.imageId))}" alt="">`;$('#poImg').value='';$('#poCap').value=p.caption||'';$('#poDesc').value=p.desc||'';
+  $('#poDate').value=/^\d{4}-\d{2}-\d{2}/.test(p.date||'')?String(p.date).slice(0,10):'';$('#poDate').max=toLocal(new Date()).slice(0,10);$('#poErr').textContent='';$('#dPost').showModal()}
+$('#poNoDate').addEventListener('click',()=>{$('#poDate').value=''});
+$('#poImg').addEventListener('change',async()=>{const f=$('#poImg').files[0];if(!f)return;if(!/^image\//.test(f.type||'')){$('#poErr').textContent="That file isn't a picture. Choose a JPG or PNG photo.";$('#poImg').value='';return}S.postImg=await shrink(f);if(S.postUrl)URL.revokeObjectURL(S.postUrl);S.postUrl=URL.createObjectURL(S.postImg);$('#poPrev').innerHTML=`<img src="${S.postUrl}" alt="">`;$('#poErr').textContent=''});
+$('#postForm').addEventListener('submit',async e=>{e.preventDefault();const p=S.post;if(!p)return;const er=$('#poErr');
+  if($('#poDate').value&&$('#poDate').value>toLocal(new Date()).slice(0,10)){er.textContent="The date rented can't be in the future.";return}
+  const b=$('#poSave');b.disabled=true;b.textContent='Saving…';
+  try{let imageId=p.imageId;if(S.postImg){imageId=(await S.assets.upload(S.postImg)).id}
+    await serial('g'+p.id,()=>S.db.doc('gallery/'+p.id).set({...(({id,...r})=>r)(p),imageId,caption:$('#poCap').value.trim(),desc:$('#poDesc').value.trim(),date:$('#poDate').value||'',updatedAt:Date.now()}));
+    if(imageId!==p.imageId&&p.imageId&&S.assets)S.assets.delete(p.imageId).catch(()=>{});
+    $('#dPost').close();toast('Post saved')}catch(x){er.textContent='Not saved. '+(x?.message||'Try again.')}finally{b.disabled=false;b.textContent='Save post'}});
+$('#poDel').addEventListener('click',async()=>{const p=S.post;if(!p||!await ask('Delete this post from Recent activity?','Delete'))return;try{await S.db.doc('gallery/'+p.id).delete();if(p.imageId&&S.assets)S.assets.delete(p.imageId).catch(()=>{});$('#dPost').close();toast('Post deleted')}catch(x){$('#poErr').textContent='Not deleted. Try again.'}});
+document.addEventListener('click',e=>{
+  const pe=e.target.closest('[data-pedit]');if(pe){openPost(pe.dataset.pedit);return}
+  const po=e.target.closest('[data-post]');if(po){const p=S.gallery.find(x=>x.id===po.dataset.post);if(p)openZoom(imgUrl(p.imageId),p.caption||'Recent activity',p.desc||'',p.date?'Rented '+fmtLong(p.date):'')}
 });
 
 /* ---------- login ---------- */
@@ -704,6 +912,7 @@ document.addEventListener('click',async e=>{
   if(t.closest('#thBack')){S.thread=null;renderMessages();return}
   const mg=t.closest('[data-msg]');if(mg){const[o,k,n,p]=mg.dataset.msg.split('|');t.closest('dialog')?.close();S.msgScrolled=false;openThread(o,k,n,p,mg.dataset.draft||'');return}
   const ab=t.closest('[data-askbk]');if(ab){S.draft=`About booking ${ab.dataset.askbk}: `;S.msgScrolled=false;location.hash='#messages';route();return}
+  const cl=t.closest('[data-clic]');if(cl){const[o,k,n]=cl.dataset.clic.split('|');cl.disabled=true;try{const img=await licGet(o,k);img?openZoom(img,`Driver's license of ${n}`):toast(`${n} hasn't uploaded a license photo yet.`)}catch(x){toast('The license photo could not be loaded.')}finally{cl.disabled=false}return}
   const cb=t.closest('[data-cbk]');if(cb){S.adm.q=cb.dataset.cbk;S.adm.status='all';$('#admQ').value=cb.dataset.cbk;location.hash='#bookings';route();return}
   const cd=t.closest('[data-cdel]');if(cd){const c=carById(cd.dataset.cdel);if(!c)return;const live=allBookings().filter(b=>b.carId===c.id&&LIVE.includes(b.status)).length;
     if(!await ask(`Delete the ${carTitle(c)} from the rental list?${live?` It has ${plural(live,'open booking')}. Those keep the car's name.`:''}`,'Delete car'))return;
@@ -741,7 +950,8 @@ $('#searchForm').addEventListener('input',()=>{if($('#fStart').value&&$('#fEnd')
 $('#fQ').addEventListener('input',renderFleet);
 $('#fFree').addEventListener('change',renderFleet);
 $('#admQ').addEventListener('input',e=>{S.adm.q=e.target.value;renderAdmin()});
-const strip=$('#strip');const stepS=dir=>{const f=strip.querySelector('figure');strip.scrollBy({left:dir*((f?.offsetWidth||280)+14),behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})};
+const strip=$('#strip');const stepS=dir=>{strip.scrollBy({left:dir*(strip.clientWidth+parseInt(getComputedStyle(strip).getPropertyValue('--gap')||16)),behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})};
+strip.addEventListener('scroll',()=>{clearTimeout(S.dotT);S.dotT=setTimeout(updDots,80)},{passive:true});addEventListener('resize',()=>{if(S.view==='fleet')updDots()});
 $('#sPrev').onclick=()=>stepS(-1);$('#sNext').onclick=()=>stepS(1);
 strip.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')stepS(-1);if(e.key==='ArrowRight')stepS(1)});
 

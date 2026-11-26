@@ -77,22 +77,31 @@ Customers can log in on any device and see their bookings, messages and details.
 
 ## What customers can do
 
-- See all cars, prices, and photos of renters posted by the admin.
+- See all cars and prices, and the **Recent activity** carousel posted by the admin.
 - Pick dates to see which cars are free and the total price.
-- Book in 3 steps: dates and extras → personal details → check and send.
+- Book in 3 steps: dates and extras → personal details and a **photo of their driver's license** → check and send. The photo shows in a small box; tapping it opens it larger, and tapping again zooms in.
 - Log in to see **My bookings** with each booking's progress and assigned driver, read the office's comments, and chat in **Messages**.
-- Edit their own details in **My details**.
+- Edit their own details in **My details**, including uploading a new driver's license photo.
 - Cancel up to 2 days before pickup. The admin can change the number of days.
 
 ## What the admin can do
 
 - **Rentals**: approve or reject requests, mark pickup and return, comment, and change bookings (dates, car, extras, driver).
-- **Customers**: everyone who has rented, with contact details and totals.
+- **Customers**: everyone who has rented, with contact details and totals. **License** opens their driver's license photo. It also shows inside each booking.
 - **Messages**: chat with customers.
 - **Fleet**: add, edit or delete cars, prices and photos.
 - **Drivers**: add, edit or delete drivers and assign them to bookings.
-- **Renter photos**: photos shown on every customer's dashboard.
-- **Settings**: extras and prices, delivery fee, cancellation rule, admin login.
+- **Recent activity**: post photos with a caption, details or description, and an optional date rented. Edit or delete posts later. Customers see them in a carousel (4 at a time on a computer, 3 on a tablet, 2 on a phone) on Cars, My bookings and My details; tapping a post shows it larger with the full description.
+- **Reports**: filter by quick dates (Today, This week Mon–Sun, This month, Last month, This year, All time) or your own From/To dates (by pickup date or date booked), customer name/mobile/email, car, driver, and office pickup or delivery. The page has three sections, each with a TOTAL row:
+  1. **Rentals and earnings**: approved, picked-up and returned bookings, the total earned, and an **Earnings by car** table (times rented, days, earned).
+  2. **Pending**: requests waiting for an answer and what they'd earn if approved.
+  3. **Cancelled and rejected**: with the office comment and the value lost.
+  **Download Excel** saves exactly what you see, with sheets: Summary, Rentals and earnings, Earnings by car, Pending, Cancelled and rejected. Works without internet.
+- **Settings**: the **website name and logo** (shown at the top of every page and in the browser tab), extras and prices, delivery fee, cancellation rule, admin login. A PNG logo with a clear background looks neatest.
+
+## On phones and small screens
+
+When the screen is narrow, the menu folds into a ☰ button at the top right. Tap it to open the menu; tap a page or anywhere outside to close it. A small number on the button shows new requests or messages.
 
 ## Files
 
@@ -113,4 +122,5 @@ car-rental-system/
 
 - The server checks every change. Only the admin can change cars, prices, drivers, settings and other people's bookings. Customers only see their own bookings and messages, can cancel in time, and can edit their own contact details. Prices are worked out on the server, so a customer can't change what they pay.
 - Customer passwords are only 4 digits. The server allows 10 login tries per minute from one address to slow down guessing.
-- Photos in a public Blob store can be opened by anyone who has their link. Car and renter photos are meant to be public. Don't upload private documents.
+- Car photos, renter photos and the logo are public: anyone with their link can open them.
+- **Driver's license photos are private.** They are stored apart from everything else (in Upstash Redis on Vercel, or `data/licenses/` on your computer), never in the public photo store. Only the admin and that customer can open them.

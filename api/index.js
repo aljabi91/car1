@@ -7,8 +7,11 @@
 const crypto = require('crypto');
 const { createApi, SAMPLE_CARS } = require('../lib/core');
 
-const R_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const R_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+/* Finds the connection settings even if Vercel added a prefix to their names (e.g. MYDB_KV_REST_API_URL) */
+const envEnding = (...ends) => { for (const e of ends) { if (process.env[e]) return process.env[e]; const k = Object.keys(process.env).find(n => n.endsWith('_' + e) && process.env[n]); if (k) return process.env[k]; } return ''; };
+const R_URL = envEnding('KV_REST_API_URL', 'UPSTASH_REDIS_REST_URL');
+const R_TOKEN = envEnding('KV_REST_API_TOKEN', 'UPSTASH_REDIS_REST_TOKEN');
+const BLOB_TOKEN = envEnding('BLOB_READ_WRITE_TOKEN');
 const HASH = 'cr:db';
 
 async function redis(cmd) {
@@ -43,6 +46,8 @@ const store = {
   async get(p) { const v = await redis(['HGET', HASH, p]); return v ? JSON.parse(v) : null; },
   async set(p, d) { await pipeline([['HSET', HASH, p, JSON.stringify(d)], ['INCR', 'cr:ver']]); },
   async del(p) { await pipeline([['HDEL', HASH, p], ['INCR', 'cr:ver']]); },
+  async getLicense(id) { return (await redis(['HGET', 'cr:lic', id])) || ''; },
+  async setLicense(id, img) { await redis(['HSET', 'cr:lic', id, img]); },
   async version() { return +(await redis(['GET', 'cr:ver'])) || 0; },
   async secret() {
     if (secret) return secret;
@@ -61,13 +66,13 @@ const EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'im
 const photos = {
   async save(buf, type) {
     const { put } = require('@vercel/blob');
-    const blob = await put(`car-rental/${crypto.randomBytes(8).toString('hex')}.${EXT[type]}`, buf, { access: 'public', contentType: type });
+    const blob = await put(`car-rental/${crypto.randomBytes(8).toString('hex')}.${EXT[type]}`, buf, { access: 'public', contentType: type, ...(BLOB_TOKEN ? { token: BLOB_TOKEN } : {}) });
     return blob.url;
   },
   async remove(id) {
     if (!/^https:\/\/[a-z0-9.-]+\.blob\.vercel-storage\.com\//i.test(id)) return;
     const { del } = require('@vercel/blob');
-    await del(id).catch(() => {});
+    await del(id, BLOB_TOKEN ? { token: BLOB_TOKEN } : undefined).catch(() => {});
   }
 };
 

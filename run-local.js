@@ -15,7 +15,9 @@ const PUB = path.join(__dirname, 'public');
 const DATA = process.env.DATA_DIR || path.join(__dirname, 'data');
 const UPLOADS = path.join(DATA, 'uploads');
 const DB_FILE = path.join(DATA, 'db.json');
+const LICENSES = path.join(DATA, 'licenses');
 fs.mkdirSync(UPLOADS, { recursive: true });
+fs.mkdirSync(LICENSES, { recursive: true });
 
 /* ---------- file storage ---------- */
 let db = {};
@@ -33,6 +35,8 @@ const store = {
   del: async p => { delete db[p]; ver++; save(); },
   secret: async () => SECRET,
   version: async () => ver,
+  getLicense: async id => { try { return fs.readFileSync(path.join(LICENSES, id + '.txt'), 'utf8'); } catch (e) { return ''; } },
+  setLicense: async (id, img) => { fs.writeFileSync(path.join(LICENSES, id + '.txt'), img); },
   tooMany: async ip => { const now = Date.now(); const t = (tries.get(ip) || []).filter(x => now - x < 60000); t.push(now); tries.set(ip, t); return t.length > 10; }
 };
 const EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif' };

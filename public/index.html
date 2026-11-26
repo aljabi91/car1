@@ -18,7 +18,8 @@
 
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="#fleet"><svg width="34" height="22" style="color:#fff"><use href="#i-car"/></svg><span>Car Rental</span></a>
+    <a class="brand" href="#fleet"><span class="blogo" id="brandLogo"><svg width="34" height="22" style="color:#fff"><use href="#i-car"/></svg></span><span id="brandName">Car Rental</span></a>
+    <button type="button" class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="nav"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path class="l1" d="M3 6h18"/><path class="l2" d="M3 12h18"/><path class="l3" d="M3 18h18"/></svg><span id="menuDot" class="count hide"></span></button>
     <nav id="nav" aria-label="Main"></nav>
     <div class="who"><span id="role">Loading…</span><button class="btn sm hide" id="logout">Log out</button></div>
   </div>
@@ -52,15 +53,6 @@
       </div>
       <p class="count-line" id="countLine"></p>
       <div class="grid" id="fleetGrid"></div>
-    </div>
-    <div class="band">
-      <div class="wrap">
-        <div class="bandhead">
-          <div><h2>On the road with our renters</h2><p class="sub">Photos from the rental office of customers with their cars.</p></div>
-          <div class="acts" id="stripNav"><button class="btn sm" id="sPrev" aria-label="Previous photos">‹</button><button class="btn sm" id="sNext" aria-label="Next photos">›</button></div>
-        </div>
-        <div class="strip" id="strip" tabindex="0" aria-label="Renter photos"></div>
-      </div>
     </div>
   </section>
 
@@ -141,7 +133,7 @@
         </div>
         <div><label for="pAddr">Address <span class="req">*</span></label><textarea id="pAddr" autocomplete="street-address"></textarea></div>
         <div class="two">
-          <div><label for="pLic">Driver's license no. <span class="req">*</span></label><input id="pLic"></div>
+          <div><label for="pLicFile">Photo of your driver's license</label><div class="licbox"><button type="button" class="licthumb" id="pLicThumb" aria-label="See your license photo larger">No photo yet</button><div><label class="btn sm" for="pLicFile">Upload new photo</label><input type="file" id="pLicFile" accept="image/*" class="vh"><p class="hint">Tap the picture to zoom.</p></div></div></div>
           <div><label for="pEmer">Emergency contact</label><input id="pEmer" placeholder="Name and number"></div>
         </div>
         <p class="note" id="pWarn"></p>
@@ -170,6 +162,29 @@
     </div>
   </section>
 
+  <!-- ADMIN: REPORTS -->
+  <section id="v-reports" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1>Reports</h1><p class="sub">Rentals and earnings, pending requests, and cancellations, with filters. Download exactly what you see as an Excel file.</p></div><button class="btn go lg" id="repXlsx">Download Excel</button></div>
+      <div class="rfilters" id="repFilters">
+        <div class="wide2"><label>Dates</label><div class="chips" id="repQuick">
+          <button type="button" class="chip" data-rq="today">Today</button><button type="button" class="chip" data-rq="week">This week</button><button type="button" class="chip" data-rq="month">This month</button><button type="button" class="chip" data-rq="lastmonth">Last month</button><button type="button" class="chip" data-rq="year">This year</button><button type="button" class="chip" data-rq="all">All time</button></div></div>
+        <div><label for="repFrom">From</label><input type="date" id="repFrom"></div>
+        <div><label for="repTo">To</label><input type="date" id="repTo"></div>
+        <div><label for="repBy">Dates are</label><select id="repBy"><option value="start">Pickup date</option><option value="created">Date booked</option></select></div>
+        <div><label for="repQ">Customer</label><input id="repQ" placeholder="Name, mobile or email"></div>
+        <div><label for="repCar">Car</label><select id="repCar"></select></div>
+        <div><label for="repDrv">Driver</label><select id="repDrv"></select></div>
+        <div><label for="repPick">How they get the car</label><select id="repPick"><option value="">Any</option><option value="office">Pick up at the office</option><option value="delivery">Delivered</option></select></div>
+        <div style="align-self:end"><button type="button" class="btn" id="repClear" style="width:100%">Clear filters</button></div>
+      </div>
+      <div class="rsum" id="repSum"></div>
+      <div class="rbar"><p class="small" id="repLine" style="margin:0"></p><span class="err" id="repErr"></span></div>
+      <nav class="chips" id="repJump" aria-label="Report sections" style="margin-bottom:8px"></nav>
+      <div id="repSections"></div>
+    </div>
+  </section>
+
   <!-- ADMIN: SETTINGS -->
   <section id="v-settings" class="view hide">
     <div class="wrap">
@@ -182,6 +197,11 @@
           <div><button type="button" class="btn" id="exAdd">Add an extra</button></div>
         </div>
         <div style="display:grid;gap:16px">
+          <div class="card" style="display:grid;gap:12px">
+            <h2>Website name and logo</h2>
+            <div><label for="setName">Website name</label><input id="setName" maxlength="40" placeholder="Car Rental"></div>
+            <div><label for="setLogoFile">Logo</label><div class="licbox"><div class="logoprev" id="setLogoPrev"></div><div style="display:grid;gap:6px"><label class="btn sm" for="setLogoFile">Upload logo</label><input type="file" id="setLogoFile" accept="image/*" class="vh"><button type="button" class="btn sm danger" id="setLogoDel">Use the car icon</button></div></div><p class="hint">A PNG with a clear background looks neatest. It's shown on the blue bar at the top.</p></div>
+          </div>
           <div class="card" style="display:grid;gap:12px">
             <h2>Fees and rules</h2>
             <div><label for="setDel">Delivery fee (₱)</label><input id="setDel" type="number" min="0" step="50"></div>
@@ -205,17 +225,31 @@
   <!-- ADMIN: PHOTOS -->
   <section id="v-photos" class="view hide">
     <div class="wrap">
-      <div class="head"><div><h1>Renter photos</h1><p class="sub">Photos you upload here show on every customer's dashboard.</p></div></div>
+      <div class="head"><div><h1>Recent activity</h1><p class="sub">Post photos of renters and trips. They show in the Recent activity carousel on every customer's dashboard, newest first.</p></div></div>
       <div class="drop" id="dropZone">
         <div class="two">
           <div><label for="pFiles">Photos <span class="req">*</span></label><input type="file" id="pFiles" accept="image/*" multiple><p class="hint">Choose files or drop them on this box.</p></div>
-          <div><label for="pCap">Caption</label><input id="pCap" placeholder="Ana and family, Baguio trip"></div>
+          <div><label for="pCap">Caption</label><input id="pCap" maxlength="80" placeholder="Ana and family, Baguio trip"></div>
         </div>
-        <div class="acts" style="justify-content:flex-start"><button class="btn go" id="pUp">Upload photos</button><span class="small" id="pMsg"></span></div>
+        <div class="two">
+          <div><label for="pDesc">Details or description</label><textarea id="pDesc" maxlength="600" placeholder="3 days in Baguio with the Toyota Innova. Thank you for renting with us!"></textarea></div>
+          <div><label for="pDate">Date rented (optional)</label><input id="pDate" type="date"><p class="hint">Leave it empty if you don't want a date shown.</p></div>
+        </div>
+        <div class="acts" style="justify-content:flex-start"><button class="btn go" id="pUp">Post</button><span class="small" id="pMsg"></span></div>
       </div>
       <div class="pgrid" id="pGrid"></div>
     </div>
   </section>
+  <section class="band" id="activityBand" aria-label="Recent activity">
+      <div class="wrap">
+        <div class="bandhead">
+          <div><h2>Recent activity</h2><p class="sub">Trips and renters, posted by the rental office. Tap a photo to see more.</p></div>
+          <div class="acts" id="stripNav"><button class="btn sm" id="sPrev" aria-label="Previous posts">‹</button><button class="btn sm" id="sNext" aria-label="Next posts">›</button></div>
+        </div>
+        <div class="strip" id="strip" tabindex="0" aria-label="Recent activity"></div>
+        <div class="dots" id="stripDots" aria-hidden="true"></div>
+      </div>
+    </section>
 </main>
 
 <!-- Booking wizard -->
@@ -245,7 +279,7 @@
           </div>
           <div><label for="bAddr">Address <span class="req">*</span></label><textarea id="bAddr" autocomplete="street-address" placeholder="House no., street, barangay, city, province"></textarea></div>
           <div class="two">
-            <div><label for="bLic">Driver's license no. <span class="req">*</span></label><input id="bLic" placeholder="N01-23-456789"></div>
+            <div><label for="bLicFile">Photo of your driver's license <span class="req">*</span></label><div class="licbox"><button type="button" class="licthumb" id="bLicThumb" aria-label="See your license photo larger">No photo yet</button><div><label class="btn sm" for="bLicFile">Upload photo</label><input type="file" id="bLicFile" accept="image/*" class="vh"><p class="hint">Take a clear photo of the front. Tap the picture to zoom.</p></div></div></div>
             <div><label for="bEmer">Emergency contact</label><input id="bEmer" placeholder="Name and number"></div>
           </div>
           <div><label for="bNotes">Notes for the office</label><textarea id="bNotes" placeholder="Flight number, destination, special requests"></textarea></div>
@@ -376,6 +410,31 @@
     </div>
     <div class="df"><button type="button" class="btn" data-close>Cancel</button><button class="btn go" id="sSave">Save admin login</button></div>
   </form>
+</dialog>
+
+<!-- Edit a recent activity post -->
+<dialog id="dPost" aria-labelledby="poT">
+  <form id="postForm" novalidate>
+    <div class="dh"><h2 id="poT">Edit post</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+    <div class="db">
+      <div class="imgprev" id="poPrev"></div>
+      <div><label for="poImg">Change photo</label><input type="file" id="poImg" accept="image/*"></div>
+      <div><label for="poCap">Caption</label><input id="poCap" maxlength="80"></div>
+      <div><label for="poDesc">Details or description</label><textarea id="poDesc" maxlength="600"></textarea></div>
+      <div><label for="poDate">Date rented (optional)</label><div class="acts" style="justify-content:flex-start;flex-wrap:nowrap"><input id="poDate" type="date" style="flex:1"><button type="button" class="btn sm" id="poNoDate">No date</button></div></div>
+      <p class="err" id="poErr" role="alert"></p>
+    </div>
+    <div class="df"><button type="button" class="btn danger" id="poDel">Delete post</button><span style="flex:1"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn go" id="poSave">Save post</button></div>
+  </form>
+</dialog>
+
+<!-- Zoom picture -->
+<dialog id="dZoom" aria-labelledby="zT">
+  <div class="dh"><h2 id="zT">Driver's license</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+  <div class="zbody" id="zBody"><img id="zImg" alt=""></div>
+  <p id="zDate"></p>
+  <p id="zDesc"></p>
+  <div class="df"><span class="small" style="margin-right:auto">Tap the picture to zoom in or out.</span><button type="button" class="btn" data-close>Close</button></div>
 </dialog>
 
 <!-- Confirm -->
