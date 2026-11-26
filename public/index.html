@@ -6,7 +6,7 @@
 <title>Car Rental System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=202611262236">
+<link rel="stylesheet" href="css/style.css?v=202611262241">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -114,6 +114,7 @@
   <section id="v-bookings" class="view hide">
     <div class="wrap">
       <div class="head"><div><h1>Rentals</h1><p class="sub">Everyone who has booked, with their details. Open a booking to mark pickup or return.</p></div><button class="btn" id="chgAdmin">Change admin login</button></div>
+      <p class="note hide" id="defPw" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span><b>Change the admin password.</b> You're still using the default login (admin1 / admin123), which anyone could guess.</span><button type="button" class="btn sm go" data-defpw>Change it now</button></p>
       <div class="stats" id="stats"></div>
       <div class="pend hide" id="pendBox"><h2 id="pendT">Waiting for your answer</h2><div id="pendList"></div></div>
       <div class="cols">
@@ -547,6 +548,6 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<script src="js/app.js?v=202611262236"></script>
+<script src="js/app.js?v=202611262241"></script>
 </body>
 </html>

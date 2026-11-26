@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
-const { createApi, canRead, SAMPLE_CARS } = require('./lib/core');
+const { createApi, canRead, viewOf, SAMPLE_CARS } = require('./lib/core');
 
 const PORT = +process.env.PORT || 3000;
 const PUB = path.join(__dirname, 'public');
@@ -38,7 +38,7 @@ const store = {
   getLicense: async id => { try { return fs.readFileSync(path.join(LICENSES, id + '.txt'), 'utf8'); } catch (e) { return ''; } },
   setLicense: async (id, img) => { fs.writeFileSync(path.join(LICENSES, id + '.txt'), img); },
   delLicense: async id => { fs.rmSync(path.join(LICENSES, id + '.txt'), { force: true }); },
-  tooMany: async ip => { const now = Date.now(); const t = (tries.get(ip) || []).filter(x => now - x < 60000); t.push(now); tries.set(ip, t); return t.length > 10; }
+  tooMany: async (ip, kind = 'login', max = 10) => { const k = kind + ':' + ip; const now = Date.now(); const t = (tries.get(k) || []).filter(x => now - x < 60000); t.push(now); tries.set(k, t); return t.length > max; }
 };
 const EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif' };
 const photos = {
@@ -50,13 +50,14 @@ const photos = {
 const clients = new Set();
 function onChange(p, doc) {
   const msg = 'data: ' + JSON.stringify({ path: p, doc }) + '\n\n';
-  for (const c of clients) if (canRead(c.a, p)) c.res.write(msg);
+  for (const c of clients) if (canRead(c.a, p)) c.res.write(doc && p.startsWith('drivers/') ? 'data: ' + JSON.stringify({ path: p, doc: viewOf(c.a, p, doc) }) + '\n\n' : msg);
 }
 setInterval(() => { for (const c of clients) c.res.write(': ping\n\n'); }, 25000);
 
 const api = createApi({ store, photos, onChange, live: true });
 
 /* ---------- http ---------- */
+const SAFE = { 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'referrer-policy': 'same-origin' };
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
 function readBody(req, max) {
   return new Promise((resolve, reject) => {
@@ -81,19 +82,19 @@ http.createServer(async (req, res) => {
       let body = {};
       if (req.method === 'POST') { const raw = await readBody(req, 8 * 1024 * 1024).catch(() => null); if (!raw) { res.writeHead(413); return res.end(); } try { body = JSON.parse(raw.toString() || '{}'); } catch (e) { body = {}; } }
       const r = await api.handle({ route: p.slice(5), method: req.method, token: req.headers['x-token'], ip: req.socket.remoteAddress, body });
-      res.writeHead(r.status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      res.writeHead(r.status, { ...SAFE, 'content-type': 'application/json', 'cache-control': 'no-store' });
       return res.end(JSON.stringify(r.json));
     }
     const up = /^\/uploads\/(up-[a-f0-9]{16}\.(jpg|png|webp|gif))$/.exec(p);
     if (up) {
       const f = path.join(UPLOADS, up[1]);
       if (!fs.existsSync(f)) { res.writeHead(404); return res.end(); }
-      res.writeHead(200, { 'content-type': TYPES[path.extname(f)], 'cache-control': 'public, max-age=31536000, immutable' });
+      res.writeHead(200, { ...SAFE, 'content-type': TYPES[path.extname(f)], 'cache-control': 'public, max-age=31536000, immutable' });
       return fs.createReadStream(f).pipe(res);
     }
     const f = path.normalize(path.join(PUB, decodeURIComponent(p === '/' ? '/index.html' : p)));
     if (!f.startsWith(PUB) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404, { 'content-type': 'text/plain' }); return res.end('Not found'); }
-    res.writeHead(200, { 'content-type': TYPES[path.extname(f).toLowerCase()] || 'application/octet-stream', 'cache-control': 'no-cache' });
+    res.writeHead(200, { ...SAFE, 'content-type': TYPES[path.extname(f).toLowerCase()] || 'application/octet-stream', 'cache-control': 'no-cache' });
     fs.createReadStream(f).pipe(res);
   } catch (e) {
     console.error(e);

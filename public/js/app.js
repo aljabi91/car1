@@ -250,6 +250,7 @@ function renderMine(){
 
 /* ---------- render: admin ---------- */
 function renderAdmin(){
+  $('#defPw').classList.toggle('hide',!(S.cfgLoaded&&!(S.adminCfg?.user&&S.adminCfg?.hash)));
   const all=allBookings();const now=toLocal(new Date());const ym=now.slice(0,7);
   const pendL=all.filter(b=>b.status==='pending').sort((a,b)=>String(a.start).localeCompare(String(b.start)));
   const out=all.filter(b=>b.status==='active').length;
@@ -1223,6 +1224,7 @@ $('#setupForm').addEventListener('submit',async e=>{
 document.addEventListener('click',async e=>{
   const t=e.target;
   if(t.closest('[data-close]')){t.closest('dialog')?.close();return}
+  if(t.closest('[data-defpw]')){openSetup();return}
   const dp=t.closest('[data-drvpic]');if(dp){openZoom(dp.src,dp.alt);return}
   const pv=t.closest('[data-pfview]');if(pv){const[o,bid,sd,i]=pv.dataset.pfview.split('|');openPf(o,bid,sd,+i);return}
   if(t.closest('[data-showterms]')){e.preventDefault();$('#tmBody').innerHTML=termsHtml(SET().terms)+(termsDate()?`<p class="small">Last updated ${esc(termsDate())}.</p>`:'');$('#dTerms').showModal();return}

@@ -141,6 +141,12 @@ car-rental-system/
 
 - The server checks every change. Only the admin can change cars, prices, drivers, settings and other people's bookings. Customers only see their own bookings and messages, can cancel in time, and can edit their own contact details. Prices are worked out on the server, so a customer can't change what they pay.
 - Customer passwords are only 4 digits. The server allows 10 login tries per minute from one address to slow down guessing.
+- **Change the admin password right away.** admin1 / admin123 is written in this README, so anyone could try it. Until you change it, the Rentals page shows a reminder with a **Change it now** button.
+- One connection can send at most 5 booking requests a minute, so nobody can flood the system with fake bookings.
+- Visitors and customers only see a driver's name, photo and whether they're available. Phone numbers, license numbers and notes stay with the admin (customers get their own driver's phone on their booking).
+- No SQL database is used, so SQL injection doesn't apply: data is stored as JSON in Upstash Redis (or `data/db.json` on your computer) and saved by exact key, never by building commands from what people type. Paths are checked against a strict pattern, so tricks like `../` are refused.
+- Everything people type (names, addresses, notes, messages, terms) is shown as plain text, so pasted HTML or scripts can't run in anyone's browser.
+- The site tells browsers not to let other websites embed it in a frame (protects against click-jacking) and not to guess file types.
 - Car photos, renter photos and the logo are public: anyone with their link can open them.
 - **Driver's license photos are private.** They are stored apart from everything else (in Upstash Redis on Vercel, or `data/licenses/` on your computer), never in the public photo store. Only the admin and that customer can open them.
 - **Pickup and return photos and signed documents are private too**, kept in the same place as license photos. Only the admin and the customer of that booking can open them; other customers and visitors can't, even with the link. Only the admin can add or remove them.

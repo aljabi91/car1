@@ -59,10 +59,10 @@ const store = {
     secret = await redis(['GET', 'cr:secret']);
     return secret;
   },
-  async tooMany(ip) {
-    const key = 'cr:rl:' + String(ip || '?').replace(/[^0-9a-fA-F:.]/g, '') + ':' + Math.floor(Date.now() / 60000);
+  async tooMany(ip, kind = 'login', max = 10) {
+    const key = 'cr:rl:' + kind + ':' + String(ip || '?').replace(/[^0-9a-fA-F:.]/g, '') + ':' + Math.floor(Date.now() / 60000);
     const [n] = await pipeline([['INCR', key], ['EXPIRE', key, 120]]);
-    return n > 10;
+    return n > max;
   }
 };
 
