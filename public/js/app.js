@@ -15,7 +15,7 @@ const STS={pending:'Pending',approved:'Approved',active:'Picked up',completed:'R
 const LIVE=['pending','approved','active'];
 const cancelBy=b=>new Date(+new Date(b.start)-SET().cancelDays*864e5);
 const canCancelNow=b=>['pending','approved'].includes(b.status)&&Date.now()<+cancelBy(b);
-const S={db:null,user:null,assets:null,uid:null,admin:false,editor:false,session:null,adminCfg:null,cfgLoaded:false,bReady:false,canWrite:true,ready:false,cars:[],gallery:[],bdocs:[],blocks:[],licCache:{},drivers:[],settings:null,chats:[],replies:[],thread:null,draft:'',local:false,adm:{status:'all',q:''},f:{type:'',trans:''},editing:null,newImg:null,dropImg:false,booking:null,step:1};
+const S={db:null,user:null,assets:null,uid:null,admin:false,editor:false,session:null,adminCfg:null,cfgLoaded:false,bReady:false,canWrite:true,ready:false,cars:[],gallery:[],bdocs:[],blocks:[],notifRead:null,licCache:{},drivers:[],settings:null,chats:[],replies:[],thread:null,draft:'',local:false,adm:{status:'all',q:''},f:{type:'',trans:''},editing:null,newImg:null,dropImg:false,booking:null,step:1};
 
 /* ---------- helpers ---------- */
 const pad=n=>String(n).padStart(2,'0');
@@ -30,7 +30,7 @@ const plural=(n,w)=>`${n} ${w}${n===1?'':'s'}`;
 const uid=()=>Math.random().toString(36).slice(2,10);
 const ref=()=>'CR-'+Date.now().toString(36).slice(-4).toUpperCase()+Math.random().toString(36).slice(2,4).toUpperCase();
 const carById=id=>S.cars.find(c=>c.id===id);
-const imgUrl=id=>{if(!id)return'';if(/^https:\/\/[a-z0-9.-]+\.blob\.vercel-storage\.com\//i.test(String(id)))return String(id);if(/^up-[a-f0-9]{16}\.(jpg|png|webp|gif)$/.test(String(id)))return'uploads/'+id;if(String(id).startsWith('img-')){if(MEMIMG[id])return MEMIMG[id];try{return localStorage.getItem('cr-'+id)||''}catch(e){return''}}return'/_blob/'+encodeURIComponent(id)};
+const imgUrl=id=>{if(!id)return'';if(/^rimg-[a-f0-9]{16}\.(jpg|png|webp|gif)$/.test(String(id)))return'api/img?id='+encodeURIComponent(id);if(/^https:\/\/[a-z0-9.-]+\.blob\.vercel-storage\.com\//i.test(String(id)))return String(id);if(/^up-[a-f0-9]{16}\.(jpg|png|webp|gif)$/.test(String(id)))return'uploads/'+id;if(String(id).startsWith('img-')){if(MEMIMG[id])return MEMIMG[id];try{return localStorage.getItem('cr-'+id)||''}catch(e){return''}}return'/_blob/'+encodeURIComponent(id)};
 const carTitle=c=>c?`${c.brand||''} ${c.name||''}`.trim():'Removed car';
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('on'),2800)}
 const Qs={};function serial(k,fn){const p=(Qs[k]||Promise.resolve()).then(()=>fn());Qs[k]=p.catch(()=>{});return p}
@@ -45,11 +45,25 @@ function carSvg(c){
   const g='g'+uid();
   return `<svg viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${esc(carTitle(c))}"><defs><linearGradient id="${g}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--surf)"/><stop offset="1" stop-color="var(--surf2)"/></linearGradient><linearGradient id="${g}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".28"/></linearGradient></defs><rect width="320" height="180" fill="url(#${g}s)"/><rect y="132" width="320" height="48" fill="#000" opacity=".05"/><g transform="translate(0,14)"><ellipse cx="164" cy="132" rx="150" ry="8" fill="#000" opacity=".2"/><path d="${body}" fill="${col}"/><path d="${body}" fill="url(#${g}b)"/><path d="${win}" fill="#1d2430" opacity=".88"/><path d="M28 104 H300" stroke="#000" stroke-opacity=".18" stroke-width="2"/><rect x="292" y="92" width="12" height="6" rx="2" fill="#ffe9a8"/><rect x="20" y="96" width="9" height="6" rx="2" fill="#e5484d"/>${[88,244].map(x=>`<circle cx="${x}" cy="120" r="21" fill="#16181d"/><circle cx="${x}" cy="120" r="10" fill="#c9ccd3"/><circle cx="${x}" cy="120" r="4" fill="#5d6068"/>`).join('')}</g></svg>`;
 }
+const SLOTS=[['front','Front view','Main photo','<path d="M5 15h14M6 15l1.5-5.5A2 2 0 0 1 9.4 8h5.2a2 2 0 0 1 1.9 1.5L18 15M4 15h16v3H4zM6 18v2M18 18v2M7.5 12.5h.01M16.5 12.5h.01" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'],
+ ['back','Back view','','<path d="M4 15h16v3H4zM6 15l1.5-5.5A2 2 0 0 1 9.4 8h5.2a2 2 0 0 1 1.9 1.5L18 15M6 18v2M18 18v2M6 13h3M15 13h3M10 16.5h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'],
+ ['interior','Interior','Dashboard and steering wheel','<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 11h5.5M14 11h5.5M12 14v6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'],
+ ['seats','Inside / seats','Front and back seats','<path d="M8 4h4a2 2 0 0 1 2 2v7h3a2 2 0 0 1 2 2v3H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM8 18v2M17 18v2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'],
+ ['other1','Other photo','For example, a side view','<path d="M4 7h3l2-2h6l2 2h3v12H4zM12 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>'],
+ ['other2','Other photo','For example, the trunk','<path d="M4 7h3l2-2h6l2 2h3v12H4zM12 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>']];
+const SLOT_LABEL=Object.fromEntries(SLOTS.map(([k,l])=>[k,l]));
+/* photos of a car, in slot order: [{id,kind}] (older cars: images[] or imageId) */
+function carPhotos(c){if(Array.isArray(c?.photos)&&c.photos.length)return c.photos.filter(p=>p&&p.id);
+  const im=Array.isArray(c?.images)&&c.images.length?c.images:(c?.imageId?[c.imageId]:[]);const order=['front','other1','other2','seats','interior','back'];return im.slice(0,6).map((id,i)=>({id,kind:order[i]}))}
+const carImgs=c=>carPhotos(c).map(p=>p.id);
+const carGallery=c=>{const ph=carPhotos(c);if(!ph.length)return carPic(c);const lab=p=>p.kind&&!/^other/.test(p.kind)?SLOT_LABEL[p.kind]:'';
+  if(ph.length<2)return `<img src="${esc(imgUrl(ph[0].id))}" alt="${esc(carTitle(c))}" loading="lazy" data-cgz data-car="${esc(c.id)}" data-i="0" style="cursor:zoom-in">${lab(ph[0])?`<span class="cg-label">${esc(lab(ph[0]))}</span>`:''}`;
+  return `<div class="cg"><div class="cg-track" data-cgt>${ph.map((p,i)=>`<img src="${esc(imgUrl(p.id))}" alt="${esc(carTitle(c))}${lab(p)?', '+esc(lab(p)):''}" loading="lazy" data-cgz data-car="${esc(c.id)}" data-i="${i}">`).join('')}</div><button type="button" class="cg-btn prev" data-cgp="-1" aria-label="Previous photo" disabled>‹</button><button type="button" class="cg-btn next" data-cgp="1" aria-label="Next photo">›</button><div class="cg-dots" aria-hidden="true">${ph.map((_,i)=>`<i class="${i?'':'on'}"></i>`).join('')}</div><span class="cg-count">1/${ph.length}</span><span class="cg-label" data-labels="${esc(JSON.stringify(ph.map(lab)))}"${lab(ph[0])?'':' hidden'}>${esc(lab(ph[0]))}</span></div>`};
 const carPic=c=>c?.imageId?`<img src="${esc(imgUrl(c.imageId))}" alt="${esc(carTitle(c))}" loading="lazy">`:carSvg(c);
 
 async function shrink(file){
-  try{const bmp=await createImageBitmap(file);const mx=S.local?1000:1600;const s=Math.min(1,mx/Math.max(bmp.width,bmp.height));if(s===1&&file.size<(S.local?3e5:1.5e6))return file;
-    const cv=document.createElement('canvas');cv.width=Math.round(bmp.width*s);cv.height=Math.round(bmp.height*s);cv.getContext('2d').drawImage(bmp,0,0,cv.width,cv.height);
+  try{const bmp=await createImageBitmap(file);const mx=S.local?1000:S.server?1280:1600;const s=Math.min(1,mx/Math.max(bmp.width,bmp.height));if(s===1&&file.type==='image/jpeg'&&file.size<(S.local?3e5:S.server?5e5:1.5e6))return file;
+    const cv=document.createElement('canvas');cv.width=Math.round(bmp.width*s);cv.height=Math.round(bmp.height*s);const g=cv.getContext('2d');g.fillStyle='#ffffff';g.fillRect(0,0,cv.width,cv.height);g.drawImage(bmp,0,0,cv.width,cv.height);
     return await new Promise(r=>cv.toBlob(b=>r(b||file),'image/jpeg',.86));}catch(e){return file}
 }
 
@@ -112,7 +126,7 @@ function route(){
   closeMenu();
   $('#activityBand').classList.toggle('hide',!ACT_VIEWS.includes(h));
   $('#nav').innerHTML=items.map(([k,l])=>{const n=k==='bookings'&&S.admin?pend:k==='messages'?unread:0;return `<a href="#${k}" ${k===h?'aria-current="page"':''}>${esc(l)}${n?`<span class="count" aria-label="${n} new">${n}</span>`:''}</a>`}).join('');
-  fitHeader();
+  renderBell();fitHeader();
   const tot=(S.admin?pend:0)+unread;$('#menuDot').textContent=tot;$('#menuDot').classList.toggle('hide',!tot);
   if(S.view!==h)scrollTo(0,0);
   S.view=h;render();
@@ -167,7 +181,7 @@ function renderFleet(){
     const flag=c.status!=='available'?`<span class="pill s-${esc(c.status)} flag">${c.status==='hidden'?'Hidden from customers':'Under maintenance'}</span>`:busy?'<span class="pill s-bad flag">Booked on your dates</span>':dateOk?'<span class="pill s-ok flag">Free on your dates</span>':'';
     const can=ok&&S.canWrite&&dateOk;
     const why=!ok?(busy?'Someone has booked it on these dates. Try other dates.':'Not available right now.'):!dateOk?'Pick your dates first.':!S.canWrite?'Booking needs Contributor access.':'';
-    return `<article class="car${ok?'':' off'}"><div class="ph">${carPic(c)}${flag}</div><div class="body">
+    return `<article class="car${ok?'':' off'}"><div class="ph">${carGallery(c)}${flag}</div><div class="body">
       <div class="title"><div><h3>${esc(carTitle(c))}</h3><div class="small">${esc(c.year||'')} ${esc(c.type||'')}</div></div><div class="price"><b>${esc(peso(c.rate))}</b><span>per day</span></div></div>
       <ul class="specs">${icon('seat',(c.seats||'?')+' seats')}${icon('gear',c.trans||'')}${icon('fuel',c.fuel||'')}${c.plate?`<li><span class="plate">${esc(c.plate)}</span></li>`:''}</ul>
       ${c.desc?`<p class="desc">${esc(c.desc)}</p>`:''}
@@ -238,7 +252,7 @@ function renderAdmin(){
 }
 function renderCars(){
   const el=$('#carList');
-  el.innerHTML=S.cars.length?[...S.cars].sort((a,b)=>carTitle(a).localeCompare(carTitle(b))).map(c=>`<div class="fleetrow"><div class="ph">${carPic(c)}</div><div class="info"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><h3>${esc(carTitle(c))}</h3><span class="pill s-${esc(c.status)}">${c.status==='available'?'Available':c.status==='hidden'?'Hidden':'Maintenance'}</span></div><div class="small">${esc(c.year||'')} ${esc(c.type||'')} · ${esc(c.seats||'?')} seats · ${esc(c.trans||'')} · ${esc(c.fuel||'')}</div>${c.plate?`<div><span class="plate">${esc(c.plate)}</span></div>`:''}</div><div class="acts"><span class="rateedit"><label for="r-${esc(c.id)}" class="small">₱ per day</label><input id="r-${esc(c.id)}" type="number" min="0" step="50" value="${esc(c.rate)}" data-rate="${esc(c.id)}"><button class="btn sm" data-saverate="${esc(c.id)}">Save price</button></span><label class="btn sm${S.assets?'':' hide'}" style="margin:0">Change photo<input type="file" accept="image/*" data-photo="${esc(c.id)}" hidden></label><button class="btn sm go" data-edit="${esc(c.id)}">Edit all details</button><button class="btn sm danger" data-cdel="${esc(c.id)}">Delete</button></div></div>`).join(''):'<div class="empty"><b>No cars yet</b><span>Add your first car to start taking bookings.</span></div>';
+  el.innerHTML=S.cars.length?[...S.cars].sort((a,b)=>carTitle(a).localeCompare(carTitle(b))).map(c=>`<div class="fleetrow"><div class="ph">${carPic(c)}</div><div class="info"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><h3>${esc(carTitle(c))}</h3><span class="pill s-${esc(c.status)}">${c.status==='available'?'Available':c.status==='hidden'?'Hidden':'Maintenance'}</span></div><div class="small">${esc(c.year||'')} ${esc(c.type||'')} · ${esc(c.seats||'?')} seats · ${esc(c.trans||'')} · ${esc(c.fuel||'')}</div>${c.plate?`<div><span class="plate">${esc(c.plate)}</span> <span class="small">${plural(carImgs(c).length,'photo')}</span></div>`:`<div class="small">${plural(carImgs(c).length,'photo')}</div>`}</div><div class="acts"><span class="rateedit"><label for="r-${esc(c.id)}" class="small">₱ per day</label><input id="r-${esc(c.id)}" type="number" min="0" step="50" value="${esc(c.rate)}" data-rate="${esc(c.id)}"><button class="btn sm" data-saverate="${esc(c.id)}">Save price</button></span><label class="btn sm${S.assets?'':' hide'}" style="margin:0">Add photo<input type="file" accept="image/*" data-photo="${esc(c.id)}" hidden></label><button class="btn sm go" data-edit="${esc(c.id)}">Edit all details</button><button class="btn sm danger" data-cdel="${esc(c.id)}">Delete</button></div></div>`).join(''):'<div class="empty"><b>No cars yet</b><span>Add your first car to start taking bookings.</span></div>';
 }
 function renderPhotos(){
   const g=[...S.gallery].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
@@ -269,7 +283,7 @@ function myPhone(){return [...myItems()].sort((a,b)=>(b.createdAt||0)-(a.created
 async function writeThread(coll,owner,key,fn){
   const d=(coll==='chats'?S.chats:S.replies).find(x=>x.id===owner);
   const threads=JSON.parse(JSON.stringify(d?.threads||{}));threads[key]=fn(threads[key]||{msgs:[]});
-  await serial(coll+owner,()=>S.db.doc(coll+'/'+owner).set({threads,updatedAt:Date.now()}));
+  await serial(coll+owner,()=>S.db.doc(coll+'/'+owner).set({...(d?Object.fromEntries(Object.entries(d).filter(([k])=>k!=='id')):{}),threads,updatedAt:Date.now()}));
 }
 async function sendMsg(text){
   const now=Date.now();const m={id:uid(),text,at:now};
@@ -473,8 +487,8 @@ async function saveOwner(owner,items){
   await serial('b'+owner,()=>S.db.doc('bookings/'+owner).set({items,updatedAt:Date.now()}));
   await serial('k'+owner,()=>S.db.doc('blocks/'+owner).set({items:slim(items)}));
 }
-async function setStatus(owner,id,status,note){
-  const items=(S.bdocs.find(x=>x.id===owner)?.items||[]).map(b=>b.id===id?{...b,status,...(note!==undefined?{adminNote:note}:{}),updatedAt:Date.now()}:b);
+async function setStatus(owner,id,status,note,extra){
+  const items=(S.bdocs.find(x=>x.id===owner)?.items||[]).map(b=>b.id===id?{...b,status,...(note!==undefined?{adminNote:note}:{}),...(extra||{}),updatedAt:Date.now()}:b);
   await saveOwner(owner,items);
 }
 async function quick(status,owner,id){
@@ -559,7 +573,7 @@ $('#drvForm').addEventListener('submit',async e=>{
   }catch(x){er('Not saved. Try again.')}
   finally{btn.disabled=false;btn.textContent='Save driver'}
 });
-$('#dImgIn').addEventListener('change',async()=>{const f=$('#dImgIn').files[0];S.dImg=f?await shrink(f):null});
+$('#dImgIn').addEventListener('change',async()=>{const f=$('#dImgIn').files[0];if(!f)return;const b=await cropImage(f,1,600);if(!b){$('#dImgIn').value='';return}S.dImg=b});
 $('#addDrv').addEventListener('click',()=>openDriver(null));
 
 /* ---------- settings (admin) ---------- */
@@ -567,7 +581,7 @@ function renderSettings(){
   if(S.setDirty)return;const st=SET();
   S.setEx=st.extras.map(x=>({...x}));drawExRows();
   $('#setDel').value=st.delivery;$('#setCancel').value=st.cancelDays;$('#setMsg').textContent='';
-  $('#setName').value=st.siteName;{const c=st.contact||{};$('#setPhone').value=c.phone||'';$('#setEmail').value=c.email||'';$('#setAddr').value=c.addr||'';$('#setHours').value=c.hours||'';$('#setFb').value=c.fb||''}S.setLogo=null;S.setLogoDrop=false;S.setLogoId=st.logoId;drawLogoPrev();
+  $('#setName').value=st.siteName;{const c=st.contact||{};$('#setPhone').value=c.phone||'';$('#setEmail').value=c.email||'';$('#setAddr').value=c.addr||'';$('#setHours').value=c.hours||'';SOCIALS.forEach(([k,id])=>$('#'+id).value=c[k]||'');$('#setOtherL').value=c.otherLabel||''}S.setLogo=null;S.setLogoDrop=false;S.setLogoId=st.logoId;drawLogoPrev();
 }
 function drawLogoPrev(){const src=S.setLogo?S.setLogoUrl:(!S.setLogoDrop&&S.setLogoId?imgUrl(S.setLogoId):'');$('#setLogoPrev').innerHTML=src?`<img src="${esc(src)}" alt="Logo preview">`:'<svg width="48" height="31" viewBox="0 0 34 22" style="color:#fff"><use href="#i-car"/></svg>';$('#setLogoDel').classList.toggle('hide',!src)}
 function drawExRows(){
@@ -593,9 +607,10 @@ $('#setSave').addEventListener('click',async()=>{
   const siteName=$('#setName').value.trim().replace(/\s+/g,' ');
   if(!siteName){msg.textContent='Enter a website name.';$('#setName').focus();return}
   if(S.setLogo&&!S.assets){msg.textContent='Only the admin can upload a logo.';return}
-  const contact={phone:$('#setPhone').value.trim(),email:$('#setEmail').value.trim(),addr:$('#setAddr').value.trim(),hours:$('#setHours').value.trim(),fb:$('#setFb').value.trim()};
+  const contact={phone:$('#setPhone').value.trim(),email:$('#setEmail').value.trim(),addr:$('#setAddr').value.trim(),hours:$('#setHours').value.trim(),otherLabel:$('#setOtherL').value.trim()};SOCIALS.forEach(([k,id])=>contact[k]=$('#'+id).value.trim());
   if(contact.email&&!/^\S+@\S+\.\S+$/.test(contact.email)){msg.textContent='Check the email address in Contact details.';$('#setEmail').focus();return}
-  if(contact.fb&&!/^https:\/\/\S+\.\S+/i.test(contact.fb)){msg.textContent='The Facebook link must start with https://';$('#setFb').focus();return}
+  for(const [k,id,l] of SOCIALS){if(contact[k]&&!/^https:\/\/\S+\.\S+/i.test(contact[k])){msg.textContent=`The ${l} link must start with https://`;$('#'+id).focus();return}}
+  if(contact.other&&!contact.otherLabel){msg.textContent='Give the other link a name, such as "Viber community".';$('#setOtherL').focus();return}
   const b=$('#setSave');b.disabled=true;const oldLogo=SET().logoId;
   try{
     let logoId=S.setLogoDrop?'':oldLogo;
@@ -609,8 +624,28 @@ $('#setSave').addEventListener('click',async()=>{
 
 /* ---------- pictures: license photos, logo, zoom ---------- */
 function setThumb(sel,img){const t=$(sel);if(!t)return;t.classList.toggle('has',!!img);t.innerHTML=img?`<img src="${esc(img)}" alt="Driver's license">`:'No photo yet';t.dataset.src=img||''}
+function openCarGallery(c,i){const ph=carPhotos(c);if(!ph.length)return;S.zg={ph,c,i};zgShow()}
+function zgShow(){const{ph,c,i}=S.zg;const p=ph[i];const L=p.kind&&!/^other/.test(p.kind)?SLOT_LABEL[p.kind]:'';
+  openZoom(imgUrl(p.id),carTitle(c));S.zg.on=true;$('#zLabel').textContent=`${L?L+' · ':''}${i+1} of ${ph.length}`;$('#zLabel').classList.remove('hide');
+  $('#zHint').textContent=ph.length>1?'Swipe or use the arrows to see more. Tap to zoom.':'Tap the picture to zoom in or out.';
+  $('#zPrev').classList.toggle('hide',ph.length<2);$('#zNext').classList.toggle('hide',ph.length<2);$('#zPrev').disabled=i<=0;$('#zNext').disabled=i>=ph.length-1}
+$('#zPrev').addEventListener('click',()=>{if(S.zg&&S.zg.i>0){S.zg.i--;zgShow()}});
+$('#zNext').addEventListener('click',()=>{if(S.zg&&S.zg.i<S.zg.ph.length-1){S.zg.i++;zgShow()}});
+$('#dZoom').addEventListener('keydown',e=>{if(!S.zg?.on)return;if(e.key==='ArrowLeft')$('#zPrev').click();if(e.key==='ArrowRight')$('#zNext').click()});
+/* swipe left/right in the larger viewer, like Instagram */
+{let sx=null,sy=0;const zb=$('#zBody');
+ zb.addEventListener('dragstart',e=>e.preventDefault());
+ zb.addEventListener('pointerdown',e=>{if(S.zg?.on&&!zb.classList.contains('big')){sx=e.clientX;sy=e.clientY}});
+ zb.addEventListener('pointercancel',()=>{sx=null});
+ zb.addEventListener('pointerup',e=>{if(sx===null)return;const dx=e.clientX-sx,dy=e.clientY-sy;sx=null;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)){S.zg.swiped=true;(dx<0?$('#zNext'):$('#zPrev')).click()}});}
+/* drag the car photos sideways with a mouse, too */
+document.addEventListener('pointerdown',e=>{const t=e.target.closest?.('[data-cgt]');if(!t||e.pointerType!=='mouse')return;const x0=e.clientX,s0=t.scrollLeft;let moved=false;t.style.scrollSnapType='none';
+  const mv=ev=>{const d=ev.clientX-x0;if(Math.abs(d)>4)moved=true;t.scrollLeft=s0-d};
+  const upf=ev=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',upf);const w=t.clientWidth,d=ev.clientX-x0;const i=Math.round(s0/w)+(Math.abs(d)>w*0.15?(d<0?1:-1):0);t.style.scrollSnapType='';t.scrollTo({left:Math.max(0,Math.min(t.children.length-1,i))*w,behavior:'smooth'});if(moved){t.dataset.dragged='1';setTimeout(()=>delete t.dataset.dragged,50)}};
+  addEventListener('pointermove',mv);addEventListener('pointerup',upf)});
+$('#dZoom').addEventListener('close',()=>{if(S.zg)S.zg.on=false;$('#zHint').textContent='Tap the picture to zoom in or out.';['#zPrev','#zNext','#zLabel'].forEach(x=>$(x).classList.add('hide'))});
 function openZoom(src,title,desc,date){$('#zDesc').textContent=desc||'';$('#zDate').textContent=date||'';$('#zT').textContent=title||"Driver's license";$('#zImg').src=src;$('#zImg').alt=title||"Driver's license";$('#zBody').classList.remove('big');$('#dZoom').showModal()}
-$('#zImg').addEventListener('click',()=>$('#zBody').classList.toggle('big'));
+$('#zImg').addEventListener('click',()=>{if(S.zg?.swiped){S.zg.swiped=false;return}$('#zBody').classList.toggle('big')});
 async function photoToDataUrl(file){
   if(!file)throw{message:'Choose a photo.'};
   if(!/^image\//.test(file.type||''))throw{message:"That file isn't a picture. Choose a JPG or PNG photo."};
@@ -644,15 +679,50 @@ async function licGet(owner,cid){
   else{const d=await S.db.doc(`licenses/${owner}/files/${cid}`).get();img=d.exists?(d.data().img||''):''}
   if(img)S.licCache[k]=img;return img;
 }
-const TRUST_IC={cal:'<path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5M9 15l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',ok:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',truck:'<path d="M3 6h11v10H3zM14 10h4l3 3v3h-7M7 19a2 2 0 1 0 0-.1M17 19a2 2 0 1 0 0-.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',user:'<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1-4 4-6 8-6s7 2 8 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',mail:'<path d="M3 6h18v12H3zM3 7l9 6 9-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',pin:'<path d="M12 21s7-6 7-12a7 7 0 0 0-14 0c0 6 7 12 7 12zM12 11a2 2 0 1 0 0-.1" fill="none" stroke="currentColor" stroke-width="2"/>',clock:'<path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',fb:'<path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H7v4h3v7h4v-7h3l1-4h-4V8.5a.5.5 0 0 1 .5-.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>'};
+const SOCIALS=[['fb','setFb','Facebook'],['ig','setIg','Instagram'],['tt','setTt','TikTok'],['yt','setYt','YouTube'],['x','setX','X (Twitter)'],['web','setWeb','Website'],['other','setOther','Other link']];
+const TRUST_IC={ig:'<rect x="3.5" y="3.5" width="17" height="17" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17" cy="7" r="1.2" fill="currentColor"/>',tt:'<path d="M14 4v10.5a3.5 3.5 0 1 1-3.5-3.5M14 4c.5 2.5 2.5 4.5 5 4.7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',yt:'<rect x="2.5" y="5.5" width="19" height="13" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor"/>',x:'<path d="M4 4l16 16M20 4L4 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',web:'<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" fill="none" stroke="currentColor" stroke-width="2"/>',other:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',chat:'<path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',car:'<path d="M3 15l2-5q1-2 3-2h8q2 0 3 2l2 5v3H3zM7 18v2M17 18v2M6.5 14h.01M17.5 14h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',x2:'<path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',cal:'<path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5M9 15l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',ok:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',truck:'<path d="M3 6h11v10H3zM14 10h4l3 3v3h-7M7 19a2 2 0 1 0 0-.1M17 19a2 2 0 1 0 0-.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',user:'<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1-4 4-6 8-6s7 2 8 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',mail:'<path d="M3 6h18v12H3zM3 7l9 6 9-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',pin:'<path d="M12 21s7-6 7-12a7 7 0 0 0-14 0c0 6 7 12 7 12zM12 11a2 2 0 1 0 0-.1" fill="none" stroke="currentColor" stroke-width="2"/>',clock:'<path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',fb:'<path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H7v4h3v7h4v-7h3l1-4h-4V8.5a.5.5 0 0 1 .5-.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>'};
 const ic2=k=>`<svg viewBox="0 0 24 24" aria-hidden="true">${TRUST_IC[k]}</svg>`;
 function renderTrust(){const st=SET();const items=[['cal',st.cancelDays>0?`Cancel online up to ${cdTxt()} before pickup`:'Book online in a few minutes'],['ok','Every booking confirmed by our office'],['truck',`Delivery to your address`,` <span class="nw">(+${esc(peso(st.delivery))})</span>`]];
   if(st.extras.some(x=>x.driver))items.push(['user','Rent with a driver']);
   $('#trust').innerHTML=items.map(([k,t,h])=>`<li>${ic2(k)}<span>${esc(t)}${h||''}</span></li>`).join('')}
+/* ---------- notifications: new bookings, messages, booking updates ---------- */
+const ago=t=>{const m=Math.round((Date.now()-t)/60000);if(m<1)return'just now';if(m<60)return m+' min ago';const h=Math.round(m/60);if(h<24)return h+(h===1?' hour ago':' hours ago');const d=Math.round(h/24);return d<8?d+(d===1?' day ago':' days ago'):new Date(t).toLocaleDateString('en-PH',{month:'short',day:'numeric'})};
+function readMap(){if(S.admin)return S.notifRead||{};if(S.session?.role==='customer'){const d=S.chats.find(x=>x.id===S.uid);return d?.notifRead?.[S.session.cid]||{}}return{}}
+function notifList(){const out=[];const cut=Date.now()-45*864e5;
+  if(S.admin){
+    allBookings().forEach(b=>{if((b.createdAt||0)>cut)out.push({id:'b:'+b.id,ic:'car',t:b.createdAt,html:`<b>New booking${b.status==='pending'?' request':''}:</b> ${esc(b.name)} booked the ${esc(b.carName)}, ${esc(fmtD(b.start))} to ${esc(fmtD(b.end))}`,go:()=>openDetail(b.owner,b.id)});
+      if(b.status==='cancelled'&&b.cancelledBy==='customer'&&(b.updatedAt||0)>cut)out.push({id:'c:'+b.id,ic:'x2',t:b.updatedAt,html:`<b>Booking cancelled:</b> ${esc(b.name)} cancelled ${esc(b.ref)} (${esc(b.carName)})`,go:()=>openDetail(b.owner,b.id)})});
+    allThreads().forEach(th=>{const last=[...(th.c.msgs||[])].pop();if(!last||last.at<cut)return;out.push({id:`m:${th.owner}|${th.key}|${last.at}`,ic:'chat',t:last.at,auto:!th.unreadA,html:`<b>New message from ${esc(th.name||'a customer')}:</b> ${esc(last.text.length>90?last.text.slice(0,90)+'…':last.text)}`,go:()=>{S.thread={owner:th.owner,key:th.key,name:th.name,phone:th.phone};S.msgScrolled=false;location.hash='#messages';route();markSeen()}})});
+  }else if(S.session?.role==='customer'){
+    const th=getThread(S.uid,myKey());const last=[...(th.a.msgs||[])].pop();
+    if(last&&last.at>cut)out.push({id:'r:'+last.at,ic:'chat',t:last.at,auto:!th.unreadC,html:`<b>Message from the office:</b> ${esc(last.text.length>90?last.text.slice(0,90)+'…':last.text)}`,go:()=>{S.msgScrolled=false;location.hash='#messages';route()}});
+    const W={approved:'is approved',rejected:'was not approved',active:'is picked up. Enjoy your trip!',completed:'is returned. Thank you for renting with us!',cancelled:'is cancelled'};
+    myItems().forEach(b=>{const t=b.updatedAt||0;if(t<cut)return;const ch=(b.changes||[]).at(-1);
+      if(b.status!=='pending'&&!(b.status==='cancelled'&&b.cancelledBy==='customer'))out.push({id:`u:${b.id}:${b.status}`,ic:'car',t:ch&&ch.at>t-2000&&b.status==='approved'?t-1:t,html:`<b>Booking ${esc(b.ref)}</b> ${esc(W[b.status]||'was updated')}${b.status==='approved'&&b.driverName?` · Driver: ${esc(b.driverName)}`:''}`,go:()=>{location.hash='#my-bookings';route()}});
+      if(ch&&ch.at>cut)out.push({id:`h:${b.id}:${(b.changes||[]).length}`,ic:'car',t:ch.at,html:`<b>Booking ${esc(b.ref)} was changed:</b> ${esc(ch.what.length>100?ch.what.slice(0,100)+'…':ch.what)}`,go:()=>{location.hash='#my-bookings';route()}})});
+  }
+  const rm=readMap();out.forEach(n=>n.read=!!rm[n.id]||!!n.auto);return out.sort((a,b)=>b.t-a.t).slice(0,40)}
+async function markRead(ids){if(!ids.length)return;
+  if(S.admin){const cur={...(S.notifRead||{})};ids.forEach(i=>cur[i]=Date.now());const keep=Object.entries(cur).sort((a,b)=>b[1]-a[1]).slice(0,400);S.notifRead=Object.fromEntries(keep);renderBell();
+    await serial('notif',()=>S.db.doc('admin/notifs').set({read:S.notifRead,updatedAt:Date.now()})).catch(()=>{})}
+  else if(S.session?.role==='customer'){const d=S.chats.find(x=>x.id===S.uid);const all={...(d?.notifRead||{})};const mine={...(all[S.session.cid]||{})};ids.forEach(i=>mine[i]=Date.now());all[S.session.cid]=Object.fromEntries(Object.entries(mine).sort((a,b)=>b[1]-a[1]).slice(0,200));
+    await serial('chats'+S.uid,()=>S.db.doc('chats/'+S.uid).set({...(d?Object.fromEntries(Object.entries(d).filter(([k])=>k!=='id')):{threads:{}}),notifRead:all,updatedAt:Date.now()})).catch(()=>{});renderBell()}}
+function renderBell(){const on=!!S.session;$('#notifWrap').classList.toggle('hide',!on);if(!on){$('#nPanel').hidden=true;return}
+  const L=notifList();S.nList=L;const un=L.filter(n=>!n.read).length;
+  $('#bellCount').textContent=un>99?'99+':un;$('#bellCount').classList.toggle('hide',!un);$('#bellBtn').setAttribute('aria-label',un?`Notifications, ${un} unread`:'Notifications');
+  $('#nAll').disabled=!un;
+  $('#nList').innerHTML=L.length?L.map((n,i)=>`<button type="button" class="nitem${n.read?'':' unread'}" data-ni="${i}"><span class="ni">${ic2(n.ic)}</span><span class="nt">${n.html}<span class="nw2">${esc(ago(n.t))}${n.read?' · <span class="rd">Read</span>':''}</span></span><span class="dot" aria-label="${n.read?'Read':'Unread'}"></span></button>`).join(''):`<div class="nempty">No notifications yet.<br>${S.admin?'New bookings and messages will show up here.':'Messages and updates about your bookings will show up here.'}</div>`}
+$('#bellBtn').addEventListener('click',e=>{e.stopPropagation();const p=$('#nPanel');p.hidden=!p.hidden;$('#bellBtn').setAttribute('aria-expanded',String(!p.hidden));if(!p.hidden){closeMenu();renderBell()}});
+$('#nList').addEventListener('click',e=>{const b=e.target.closest('[data-ni]');if(!b)return;const n=S.nList[+b.dataset.ni];if(!n)return;$('#nPanel').hidden=true;$('#bellBtn').setAttribute('aria-expanded','false');if(!n.read)markRead([n.id]);n.go()});
+$('#nAll').addEventListener('click',e=>{e.stopPropagation();markRead((S.nList||[]).filter(n=>!n.read).map(n=>n.id))});
+document.addEventListener('click',e=>{if(!$('#nPanel').hidden&&!e.target.closest('#notifWrap')){$('#nPanel').hidden=true;$('#bellBtn').setAttribute('aria-expanded','false')}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#nPanel').hidden){$('#nPanel').hidden=true;$('#bellBtn').focus()}});
 function renderFooter(){const st=SET();const c=st.contact||{};
   $('#footName').textContent=st.siteName;$('#footLogo').innerHTML=st.logoId?`<img src="${esc(imgUrl(st.logoId))}" alt="">`:'<svg width="34" height="22" style="color:#fff"><use href="#i-car"/></svg>';
-  const li=[];if(c.phone)li.push(`<li>${ic2('phone')}<span>${esc(c.phone)}</span></li>`);if(c.email)li.push(`<li>${ic2('mail')}<span>${esc(c.email)}</span></li>`);if(c.addr)li.push(`<li>${ic2('pin')}<span>${esc(c.addr)}</span></li>`);if(c.hours)li.push(`<li>${ic2('clock')}<span>${esc(c.hours)}</span></li>`);if(/^https:\/\//i.test(c.fb||''))li.push(`<li>${ic2('fb')}<a href="${esc(c.fb)}" target="_blank" rel="noopener">Facebook page</a></li>`);
-  $('#footContact').innerHTML=li.length?li.join(''):`<li class="small">${S.admin?'Add your contact details in Settings.':'Message us after you book, under Messages.'}</li>`;
+  const li=[];if(c.phone)li.push(`<li>${ic2('phone')}<span>${esc(c.phone)}</span></li>`);if(c.email)li.push(`<li>${ic2('mail')}<span>${esc(c.email)}</span></li>`);if(c.addr)li.push(`<li>${ic2('pin')}<span>${esc(c.addr)}</span></li>`);if(c.hours)li.push(`<li>${ic2('clock')}<span>${esc(c.hours)}</span></li>`);li.push(`<li class="small" style="color:#c9d6ee">${ic2('chat')}<span>Message us after you book, under <a href="${S.session&&!S.admin?'#messages':'#login'}">Messages</a>.</span></li>`);
+  const soc=SOCIALS.filter(([k])=>/^https:\/\//i.test(c[k]||'')).map(([k,,l])=>`<a class="soc" href="${esc(c[k])}" target="_blank" rel="noopener">${ic2(k==='fb'?'fb':k)}<span>${esc(k==='other'?(c.otherLabel||'Other link'):k==='fb'?'Facebook':l)}</span></a>`);
+  if(soc.length)li.push(`<li class="socs">${soc.join('')}</li>`);else if(S.admin)li.push('<li class="small">Add your social media links in Settings.</li>');
+  $('#footContact').innerHTML=li.join('');
   $('#footCopy').textContent=`© ${new Date().getFullYear()} ${st.siteName}`;$('#heroKicker').textContent=st.siteName;
   $('#footLogin').textContent=S.session?'My account':'Log in';$('#footLogin').href=S.session?(S.admin?'#bookings':'#my-bookings'):'#login'}
 function applyBrand(){
@@ -770,6 +840,46 @@ $('#repXlsx').addEventListener('click',async()=>{
   try{await saveFile(blob,name);toast('Excel file ready: '+name)}catch(x){if(x?.code!=='declined')$('#repErr').textContent=x?.message||'The file could not be saved.'}
 });
 
+/* ---------- car photo carousel ---------- */
+function cgUpdate(t){const n=t.children.length,i=Math.round(t.scrollLeft/(t.clientWidth||1));const g=t.parentElement;const lb=g.querySelector('[data-labels]');if(lb){const L=JSON.parse(lb.dataset.labels)[i]||'';lb.textContent=L;lb.hidden=!L}g.querySelectorAll('.cg-dots i').forEach((d,k)=>d.classList.toggle('on',k===i));const c=g.querySelector('.cg-count');if(c)c.textContent=`${i+1}/${n}`;g.querySelector('.prev').disabled=i<=0;g.querySelector('.next').disabled=i>=n-1}
+document.addEventListener('scroll',e=>{const t=e.target;if(t?.matches?.('[data-cgt]')){clearTimeout(t._cgT);t._cgT=setTimeout(()=>cgUpdate(t),60)}},true);
+document.addEventListener('click',e=>{const b=e.target.closest('[data-cgp]');if(b){e.stopPropagation();const t=b.parentElement.querySelector('[data-cgt]');t.scrollBy({left:(+b.dataset.cgp)*t.clientWidth,behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});return}
+  const z=e.target.closest('[data-cgz]');if(z&&z.closest('[data-cgt]')?.dataset.dragged)return;if(z){const c=carById(z.dataset.car);if(c)openCarGallery(c,+z.dataset.i||0)}});
+
+/* ---------- photo editor: zoom in/out and drag to position ---------- */
+function cropImage(file,aspect,outW,step){return new Promise(async resolve=>{
+  if(!file||!/^image\//.test(file.type||'')){toast("That file isn't a picture. Choose a JPG or PNG photo.");return resolve(null)}
+  let bmp;try{bmp=await createImageBitmap(file)}catch(e){toast("That picture can't be opened. Try a JPG or PNG.");return resolve(null)}
+  const d=$('#dCrop'),box=$('#crBox'),cv=$('#crCv'),zoom=$('#crZoom');
+  box.style.aspectRatio=String(aspect);$('#crStep').textContent=step||'';
+  const iw=bmp.width,ih=bmp.height;let W=0,H=0,s=1,cx=0,cy=0,minS=1,maxS=1,cover=1;
+  const toSlider=v=>Math.log(v/minS)/Math.log(maxS/minS)*100,fromSlider=t=>minS*Math.pow(maxS/minS,t/100);
+  const clamp=()=>{const w=iw*s,h=ih*s;cx=w>=W?Math.min(w/2,Math.max(W-w/2,cx)):Math.max(w/2,Math.min(W-w/2,cx));cy=h>=H?Math.min(h/2,Math.max(H-h/2,cy)):Math.max(h/2,Math.min(H-h/2,cy))};
+  const draw=()=>{const r=devicePixelRatio||1;cv.width=Math.round(W*r);cv.height=Math.round(H*r);const g=cv.getContext('2d');g.setTransform(r,0,0,r,0,0);g.fillStyle='#ffffff';g.fillRect(0,0,W,H);g.imageSmoothingQuality='high';g.drawImage(bmp,cx-iw*s/2,cy-ih*s/2,iw*s,ih*s);zoom.value=toSlider(s)};
+  const setS=(ns,px=W/2,py=H/2)=>{ns=Math.max(minS,Math.min(maxS,ns));cx=px+(cx-px)*(ns/s);cy=py+(cy-py)*(ns/s);s=ns;clamp();draw()};
+  const layout=()=>{const nW=box.clientWidth,nH=box.clientHeight;if(!nW||!nH)return;const k=W?nW/W:1;cx*=k;cy*=k;s*=W?k:1;W=nW;H=nH;cover=Math.max(W/iw,H/ih);minS=Math.min(W/iw,H/ih);maxS=cover*4;if(!s||s<minS)s=minS;clamp();draw()};
+  d.showModal();await new Promise(r=>requestAnimationFrame(r));
+  W=box.clientWidth;H=box.clientHeight;cover=Math.max(W/iw,H/ih);minS=Math.min(W/iw,H/ih);maxS=cover*4;s=cover;cx=W/2;cy=H/2;draw();
+  const ro=new ResizeObserver(layout);ro.observe(box);
+  const pts=new Map();let last=null,pinch=0;
+  const down=e=>{box.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});box.classList.add('drag');if(pts.size===2){const[a,b]=[...pts.values()];pinch=Math.hypot(a.x-b.x,a.y-b.y)}last={x:e.clientX,y:e.clientY}};
+  const move=e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pts.size===2){const[a,b]=[...pts.values()];const dist=Math.hypot(a.x-b.x,a.y-b.y);if(pinch){const rc=box.getBoundingClientRect();setS(s*dist/pinch,(a.x+b.x)/2-rc.left,(a.y+b.y)/2-rc.top)}pinch=dist;return}
+    if(last){cx+=e.clientX-last.x;cy+=e.clientY-last.y;clamp();draw()}last={x:e.clientX,y:e.clientY}};
+  const up=e=>{pts.delete(e.pointerId);if(pts.size<2)pinch=0;if(!pts.size){box.classList.remove('drag');last=null}else{const p=[...pts.values()][0];last={x:p.x,y:p.y}}};
+  const wheel=e=>{e.preventDefault();const rc=box.getBoundingClientRect();setS(s*Math.pow(1.0015,-e.deltaY),e.clientX-rc.left,e.clientY-rc.top)};
+  const key=e=>{const st=20;if(e.key==='ArrowLeft'){cx-=st}else if(e.key==='ArrowRight'){cx+=st}else if(e.key==='ArrowUp'){cy-=st}else if(e.key==='ArrowDown'){cy+=st}else if(e.key==='+'||e.key==='='){setS(s*1.15);return}else if(e.key==='-'){setS(s/1.15);return}else return;e.preventDefault();clamp();draw()};
+  box.tabIndex=0;box.addEventListener('pointerdown',down);box.addEventListener('pointermove',move);box.addEventListener('pointerup',up);box.addEventListener('pointercancel',up);box.addEventListener('wheel',wheel,{passive:false});box.addEventListener('keydown',key);
+  const onZoom=()=>setS(fromSlider(+zoom.value));zoom.addEventListener('input',onZoom);
+  $('#crIn').onclick=()=>setS(s*1.2);$('#crOut').onclick=()=>setS(s/1.2);
+  $('#crFill').onclick=()=>{s=cover;cx=W/2;cy=H/2;clamp();draw()};$('#crFit').onclick=()=>{s=minS;cx=W/2;cy=H/2;clamp();draw()};
+  const finish=async ok=>{ro.disconnect();box.removeEventListener('pointerdown',down);box.removeEventListener('pointermove',move);box.removeEventListener('pointerup',up);box.removeEventListener('pointercancel',up);box.removeEventListener('wheel',wheel);box.removeEventListener('keydown',key);zoom.removeEventListener('input',onZoom);
+    d.onclose=null;d.oncancel=null;if(d.open)d.close();if(!ok)return resolve(null);
+    const outH=Math.round(outW/aspect),k=outW/W,o=document.createElement('canvas');o.width=outW;o.height=outH;const g=o.getContext('2d');g.fillStyle='#ffffff';g.fillRect(0,0,outW,outH);g.imageSmoothingQuality='high';g.drawImage(bmp,(cx-iw*s/2)*k,(cy-ih*s/2)*k,iw*s*k,ih*s*k);
+    o.toBlob(b=>resolve(b),'image/jpeg',.86)};
+  $('#crOk').onclick=()=>finish(true);$('#crCancel').onclick=()=>finish(false);$('#crX').onclick=()=>finish(false);d.oncancel=e=>{e.preventDefault();finish(false)};
+})}
+
 /* ---------- change booking (admin) ---------- */
 function openEdit(owner,id){
   const b=allBookings().find(x=>x.owner===owner&&x.id===id);if(!b)return;S.edit={owner,id,b};
@@ -827,37 +937,48 @@ $('#editForm').addEventListener('submit',async e=>{
 /* ---------- car editor ---------- */
 $('#cType').innerHTML=TYPES.map(t=>`<option>${t}</option>`).join('');
 function carFromForm(){const v=id=>$(id).value.trim();return{brand:v('#cBrand'),name:v('#cName'),year:+v('#cYear')||'',type:$('#cType').value,seats:+v('#cSeats')||'',trans:$('#cTrans').value,fuel:$('#cFuel').value,color:$('#cColor').value,rate:+v('#cRate')||0,deposit:+v('#cDep')||0,plate:v('#cPlate').toUpperCase(),desc:v('#cDesc'),status:$('#cStatus').value}}
-function carPrev(){const c=carFromForm();$('#cPrev').innerHTML=S.newImg?`<img src="${S.newImgUrl}" alt="">`:(!S.dropImg&&S.editing?.imageId)?carPic({...c,imageId:S.editing.imageId}):carSvg(c);$('#cImgDel').classList.toggle('hide',!(S.newImg||(!S.dropImg&&S.editing?.imageId)))}
+function carPrev(){const c=carFromForm();const first=SLOTS.map(([k])=>S.carSlots?.[k]).find(Boolean);$('#cPrev').innerHTML=first?`<img src="${esc(first.url)}" alt="Main photo">`:carSvg(c);drawSlots()}
+function drawSlots(){const sl=S.carSlots||{};const n=SLOTS.filter(([k])=>sl[k]).length;$('#cPhotoCount').textContent=n?`(${n} of 6)`:'';
+  const mainK=SLOTS.map(([k])=>k).find(k=>sl[k]);
+  $('#cSlots').innerHTML=SLOTS.map(([k,l,h,ic])=>{const x=sl[k];return x?`<div class="slot has"><div class="pic"><img src="${esc(x.url)}" alt="${esc(l)}">${k===mainK?'<span class="mainb">Main</span>':''}</div><div class="meta"><b>${esc(l)}</b></div><div class="acts2"><button type="button" class="btn" data-slot="${k}" data-sa="add">Change</button><button type="button" class="btn danger" data-slot="${k}" data-sa="rm">Remove</button></div></div>`
+    :`<div class="slot"><div class="pic"><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg></div><div class="meta"><span><b>${esc(l)}</b>${h?`<br><span class="small">${esc(h)}</span>`:''}</span></div><div class="acts2"><button type="button" class="btn sm go" data-slot="${k}" data-sa="add" ${S.assets?'':'disabled'}>Add</button></div></div>`}).join('')}
 function openCar(id){
-  const c=id?carById(id):null;S.editing=c;S.newImg=null;S.dropImg=false;$('#cImg').value='';$('#cErr').textContent='';
+  const c=id?carById(id):null;S.editing=c;$('#cImg').value='';$('#cErr').textContent='';
+  S.carSlots={};carPhotos(c).forEach(p=>{let k=p.kind&&SLOT_LABEL[p.kind]&&!S.carSlots[p.kind]?p.kind:SLOTS.map(([x])=>x).find(x=>!S.carSlots[x]);if(k)S.carSlots[k]={id:p.id,url:imgUrl(p.id)}});
   const d=c||{type:'Sedan',seats:5,trans:'Automatic',fuel:'Gasoline',color:'#c0392b',status:'available',year:new Date().getFullYear()};
   [['#cBrand','brand'],['#cName','name'],['#cYear','year'],['#cSeats','seats'],['#cRate','rate'],['#cDep','deposit'],['#cPlate','plate'],['#cDesc','desc']].forEach(([s,k])=>$(s).value=d[k]??'');
   $('#cType').value=d.type;$('#cTrans').value=d.trans;$('#cFuel').value=d.fuel;$('#cColor').value=/^#[0-9a-f]{6}$/i.test(d.color||'')?d.color:'#8a8f99';$('#cStatus').value=d.status||'available';
   $('#carT').textContent=c?'Edit '+carTitle(c):'Add a car';$('#cDel').classList.toggle('hide',!c);
-  $('#cImg').disabled=!S.assets;carPrev();$('#dCar').showModal();
+  carPrev();$('#dCar').showModal();
 }
 $('#carForm').addEventListener('input',e=>{if(e.target.id!=='cImg')carPrev()});
-$('#cImg').addEventListener('change',async()=>{const f=$('#cImg').files[0];if(!f)return;S.newImg=await shrink(f);if(S.newImgUrl)URL.revokeObjectURL(S.newImgUrl);S.newImgUrl=URL.createObjectURL(S.newImg);S.dropImg=false;carPrev()});
-$('#cImgDel').addEventListener('click',()=>{S.dropImg=true;S.newImg=null;$('#cImg').value='';carPrev()});
+$('#cSlots').addEventListener('click',e=>{const b=e.target.closest('[data-slot]');if(!b)return;const k=b.dataset.slot;
+  if(b.dataset.sa==='rm'){delete S.carSlots[k];carPrev();return}
+  S.slotFor=k;$('#cImg').click()});
+$('#cImg').addEventListener('change',async()=>{const f=$('#cImg').files[0];$('#cImg').value='';const k=S.slotFor;if(!f||!k)return;$('#cErr').textContent='';
+  $('#crT').textContent='Adjust photo: '+SLOT_LABEL[k];const b=await cropImage(f,16/9,1280);$('#crT').textContent='Adjust photo';
+  if(b){S.carSlots[k]={blob:b,url:URL.createObjectURL(b)}}carPrev()});
 $('#carForm').addEventListener('submit',async e=>{
   e.preventDefault();const c=carFromForm();
   if(!c.brand||!c.name){$('#cErr').textContent='Enter the brand and model.';return}
   if(!(c.rate>0)){$('#cErr').textContent='Enter a price per day above zero.';return}
   const btn=$('#cSave');btn.disabled=true;btn.textContent='Saving…';
   try{
-    const old=S.editing;let imageId=old?.imageId||'';
-    if(S.newImg){const up=await S.assets.upload(S.newImg);imageId=up.id}else if(S.dropImg)imageId='';
-    const id=old?.id||'car-'+uid();
-    await serial('c'+id,()=>S.db.doc('cars/'+id).set({...c,imageId,createdAt:old?.createdAt||Date.now(),updatedAt:Date.now()}));
-    if(old?.imageId&&old.imageId!==imageId&&S.assets)S.assets.delete(old.imageId).catch(()=>{});
+    const old=S.editing;const photos=[];const todo=SLOTS.filter(([k])=>S.carSlots[k]&&!S.carSlots[k].id).length;let up=0;
+    for(const [k,l] of SLOTS){const x=S.carSlots[k];if(!x)continue;
+      if(!x.id){up++;btn.textContent=`Uploading photo ${up} of ${todo}…`;try{x.id=(await S.assets.upload(x.blob)).id}catch(err){throw{message:`The ${l} photo was not uploaded: ${err?.message||'try a smaller photo'}`}}}
+      photos.push({id:x.id,kind:k})}
+    const images=photos.map(p=>p.id);const id=old?.id||'car-'+uid();
+    await serial('c'+id,()=>S.db.doc('cars/'+id).set({...c,imageId:images[0]||'',images,photos,createdAt:old?.createdAt||Date.now(),updatedAt:Date.now()}));
+    if(S.assets)carImgs(old).filter(x=>!images.includes(x)).forEach(x=>S.assets.delete(x).catch(()=>{}));
     $('#dCar').close();toast(old?'Car saved':'Car added');
-  }catch(x){$('#cErr').textContent='The car was not saved. '+(x?.message||'')}
+  }catch(x){$('#cErr').textContent='The car was not saved. '+(x?.message||'Check your connection and try again.')}
   finally{btn.disabled=false;btn.textContent='Save car'}
 });
 $('#cDel').addEventListener('click',async()=>{
   const c=S.editing;if(!c)return;const live=allBookings().filter(b=>b.carId===c.id&&LIVE.includes(b.status)).length;
   if(!await ask(`Delete the ${carTitle(c)}?${live?` It has ${plural(live,'open booking')}. Those keep the car's name.`:''}`,'Delete car'))return;
-  try{await S.db.doc('cars/'+c.id).delete();if(c.imageId&&S.assets)S.assets.delete(c.imageId).catch(()=>{});$('#dCar').close();toast('Car deleted')}catch(x){$('#cErr').textContent='The car was not deleted. Try again.'}
+  try{await S.db.doc('cars/'+c.id).delete();if(S.assets)carImgs(c).forEach(x=>S.assets.delete(x).catch(()=>{}));$('#dCar').close();toast('Car deleted')}catch(x){$('#cErr').textContent='The car was not deleted. Try again.'}
 });
 
 /* ---------- photos ---------- */
@@ -871,9 +992,11 @@ $('#pUp').addEventListener('click',async()=>{
   if(!files.length){msg.textContent='Choose at least one photo to post.';return}
   if($('#pDate').value&&$('#pDate').value>toLocal(new Date()).slice(0,10)){msg.textContent="The date rented can't be in the future.";return}
   const btn=$('#pUp');btn.disabled=true;let ok=0;
-  for(const f of files){msg.textContent=`Uploading ${ok+1} of ${files.length}…`;
+  let n=0;for(const f of files){n++;
     if(!/^image\//.test(f.type||'')){msg.textContent=`${f.name} isn't a picture. Choose JPG or PNG photos.`;continue}
-    try{const up=await S.assets.upload(await shrink(f));const id='p-'+uid();await S.db.doc('gallery/'+id).set({imageId:up.id,caption:$('#pCap').value.trim(),desc:$('#pDesc').value.trim(),date:$('#pDate').value||'',createdAt:Date.now()});ok++}catch(x){msg.textContent='A photo was not posted: '+(x?.message||'error')}}
+    const cb=await cropImage(f,4/3,1200,files.length>1?`Photo ${n} of ${files.length}`:'');if(!cb){msg.textContent=`Photo ${n} skipped.`;continue}
+    msg.textContent=`Posting ${n} of ${files.length}…`;
+    try{const up=await S.assets.upload(cb);const id='p-'+uid();await S.db.doc('gallery/'+id).set({imageId:up.id,caption:$('#pCap').value.trim(),desc:$('#pDesc').value.trim(),date:$('#pDate').value||'',createdAt:Date.now()});ok++}catch(x){msg.textContent='A photo was not posted: '+(x?.message||'error')}}
   btn.disabled=false;if(ok){$('#pFiles').value='';$('#pCap').value='';$('#pDesc').value='';$('#pDate').value='';msg.textContent=`${plural(ok,'photo')} posted. Customers can see ${ok===1?'it':'them'} in Recent activity.`}
 });
 
@@ -882,7 +1005,7 @@ function openPost(id){const p=S.gallery.find(x=>x.id===id);if(!p)return;S.post=p
   $('#poPrev').innerHTML=`<img src="${esc(imgUrl(p.imageId))}" alt="">`;$('#poImg').value='';$('#poCap').value=p.caption||'';$('#poDesc').value=p.desc||'';
   $('#poDate').value=/^\d{4}-\d{2}-\d{2}/.test(p.date||'')?String(p.date).slice(0,10):'';$('#poDate').max=toLocal(new Date()).slice(0,10);$('#poErr').textContent='';$('#dPost').showModal()}
 $('#poNoDate').addEventListener('click',()=>{$('#poDate').value=''});
-$('#poImg').addEventListener('change',async()=>{const f=$('#poImg').files[0];if(!f)return;if(!/^image\//.test(f.type||'')){$('#poErr').textContent="That file isn't a picture. Choose a JPG or PNG photo.";$('#poImg').value='';return}S.postImg=await shrink(f);if(S.postUrl)URL.revokeObjectURL(S.postUrl);S.postUrl=URL.createObjectURL(S.postImg);$('#poPrev').innerHTML=`<img src="${S.postUrl}" alt="">`;$('#poErr').textContent=''});
+$('#poImg').addEventListener('change',async()=>{const f=$('#poImg').files[0];if(!f)return;if(!/^image\//.test(f.type||'')){$('#poErr').textContent="That file isn't a picture. Choose a JPG or PNG photo.";$('#poImg').value='';return}const pb=await cropImage(f,4/3,1200);$('#poImg').value='';if(!pb)return;S.postImg=pb;if(S.postUrl)URL.revokeObjectURL(S.postUrl);S.postUrl=URL.createObjectURL(S.postImg);$('#poPrev').innerHTML=`<img src="${S.postUrl}" alt="">`;$('#poErr').textContent=''});
 $('#postForm').addEventListener('submit',async e=>{e.preventDefault();const p=S.post;if(!p)return;const er=$('#poErr');
   if($('#poDate').value&&$('#poDate').value>toLocal(new Date()).slice(0,10)){er.textContent="The date rented can't be in the future.";return}
   const b=$('#poSave');b.disabled=true;b.textContent='Saving…';
@@ -936,7 +1059,7 @@ document.addEventListener('click',async e=>{
   const cb=t.closest('[data-cbk]');if(cb){S.adm.q=cb.dataset.cbk;S.adm.status='all';$('#admQ').value=cb.dataset.cbk;location.hash='#bookings';route();return}
   const cd=t.closest('[data-cdel]');if(cd){const c=carById(cd.dataset.cdel);if(!c)return;const live=allBookings().filter(b=>b.carId===c.id&&LIVE.includes(b.status)).length;
     if(!await ask(`Delete the ${carTitle(c)} from the rental list?${live?` It has ${plural(live,'open booking')}. Those keep the car's name.`:''}`,'Delete car'))return;
-    try{await S.db.doc('cars/'+c.id).delete();if(c.imageId&&S.assets)S.assets.delete(c.imageId).catch(()=>{});toast(carTitle(c)+' deleted')}catch(x){toast('Car not deleted. Try again.')}return}
+    try{await S.db.doc('cars/'+c.id).delete();if(S.assets)carImgs(c).forEach(x=>S.assets.delete(x).catch(()=>{}));toast(carTitle(c)+' deleted')}catch(x){toast('Car not deleted. Try again.')}return}
   const de=t.closest('[data-dedit]');if(de){openDriver(de.dataset.dedit);return}
   const dd=t.closest('[data-ddel]');if(dd){const d=S.drivers.find(x=>x.id===dd.dataset.ddel);if(!d)return;const n=allBookings().filter(b=>b.driverId===d.id&&LIVE.includes(b.status)).length;
     if(!await ask(`Delete ${d.name} from the drivers list?${n?` They are assigned to ${plural(n,'open booking')}; those keep the driver's name until you change it.`:''}`,'Delete driver'))return;
@@ -952,7 +1075,7 @@ document.addEventListener('click',async e=>{
   const qk=t.closest('[data-quick]');if(qk){const[s,o,i]=qk.dataset.quick.split('|');qk.disabled=true;await quick(s,o,i);qk.disabled=false;return}
   const op=t.closest('[data-open]');if(op){const[o,i]=op.dataset.open.split('|');openDetail(o,i);return}
   const row=t.closest('[data-bk]');if(row){const[o,i]=row.dataset.bk.split('|');openDetail(o,i);return}
-  const cn=t.closest('[data-cancel]');if(cn){const b=myItems().find(x=>x.id===cn.dataset.cancel);if(b&&!canCancelNow(b)){toast(`Cancellation is only possible up to ${cdTxt()} before pickup. Message the office.`);renderMine();return}if(!b||!await ask(`Cancel booking ${b.ref} for the ${b.carName}?`,'Cancel booking'))return;try{await setStatus(S.uid,b.id,'cancelled');toast('Booking cancelled')}catch(x){toast('Not cancelled. Try again.')}return}
+  const cn=t.closest('[data-cancel]');if(cn){const b=myItems().find(x=>x.id===cn.dataset.cancel);if(b&&!canCancelNow(b)){toast(`Cancellation is only possible up to ${cdTxt()} before pickup. Message the office.`);renderMine();return}if(!b||!await ask(`Cancel booking ${b.ref} for the ${b.carName}?`,'Cancel booking'))return;try{await setStatus(S.uid,b.id,'cancelled',undefined,{cancelledBy:'customer'});toast('Booking cancelled')}catch(x){toast('Not cancelled. Try again.')}return}
   const pd=t.closest('[data-pdel]');if(pd){const p=S.gallery.find(x=>x.id===pd.dataset.pdel);if(!p||!await ask('Delete this photo from the dashboard?','Delete'))return;try{await S.db.doc('gallery/'+p.id).delete();if(p.imageId&&S.assets)S.assets.delete(p.imageId).catch(()=>{});toast('Photo deleted')}catch(x){toast('Not deleted. Try again.')}return}
   const sr=t.closest('[data-saverate]');if(sr){const id=sr.dataset.saverate;const c=carById(id);const v=+document.getElementById('r-'+id)?.value;
     if(!c||!(v>0)){toast('Enter a price above zero');return}
@@ -960,8 +1083,12 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('change',async e=>{
   const inp=e.target.closest('[data-photo]');if(!inp||!inp.files[0])return;const id=inp.dataset.photo;const c=carById(id);if(!c||!S.assets)return;
+  const ph=carPhotos(c);const used=new Set(ph.map(p=>p.kind));const slot=SLOTS.find(([k])=>!used.has(k));
+  if(!slot){toast('All 6 photo slots are used. Open Edit all details to change or remove one.');inp.value='';return}
+  $('#crT').textContent='Adjust photo: '+slot[1];
+  const cropped=await cropImage(inp.files[0],16/9,1280);$('#crT').textContent='Adjust photo';if(!cropped){inp.value='';return}
   toast('Uploading photo…');
-  try{const up=await S.assets.upload(await shrink(inp.files[0]));await serial('c'+id,()=>S.db.doc('cars/'+id).update({imageId:up.id,updatedAt:Date.now()}));if(c.imageId&&c.imageId!==up.id)S.assets.delete(c.imageId).catch(()=>{});toast('New photo for the '+carTitle(c))}
+  try{const up=await S.assets.upload(cropped);const order=SLOTS.map(([k])=>k);const photos=[...ph,{id:up.id,kind:slot[0]}].sort((a,b)=>order.indexOf(a.kind)-order.indexOf(b.kind));const images=photos.map(p=>p.id);await serial('c'+id,()=>S.db.doc('cars/'+id).update({imageId:images[0],images,photos,updatedAt:Date.now()}));toast(`Added as ${slot[1]} for the ${carTitle(c)}`)}
   catch(x){toast('Photo not uploaded. Try again.')}finally{inp.value=''}
 });
 document.addEventListener('keydown',e=>{if(e.key==='Enter'){const row=e.target.closest?.('[data-bk]');if(row){const[o,i]=row.dataset.bk.split('|');openDetail(o,i)}}});
@@ -1066,6 +1193,6 @@ route();
   if(S.editor||S.server)db.doc('admin/config').onSnapshot(d=>{S.adminCfg=d.exists?d.data():null;S.cfgLoaded=true;restore();render()},()=>{S.cfgLoaded=true;render()});if(!S.editor)S.cfgLoaded=true;
   const timer=setTimeout(()=>{if(!S.ready){$('#fleetNote').textContent='The cars are taking a while to load. Check your connection.';S.ready=true;render()}},10000);
   const sub=(name,key,after)=>db.collection(name).onSnapshot(snap=>{S[key]=snap.docs.map(d=>({id:d.id,...d.data()}));if(name==='cars'){S.ready=true;clearTimeout(timer)}route();after&&after()},err=>{if(name==='bookings'){S.bReady=true;restore()}if(name==='cars'){S.ready=true;clearTimeout(timer);$('#fleetNote').textContent="The cars can't be loaded right now. Reload the page to try again."}render()});
-  sub('cars','cars');sub('gallery','gallery');sub('bookings','bdocs',()=>{S.bReady=true;restore()});sub('blocks','blocks');sub('drivers','drivers');db.doc('settings/main').onSnapshot(d=>{S.settings=d.exists?d.data():null;render()},()=>{});sub('chats','chats',()=>{if(S.view==='messages'){clearTimeout(S.seenT);S.seenT=setTimeout(markSeen,800)}});sub('replies','replies',()=>{if(S.view==='messages'){clearTimeout(S.seenT);S.seenT=setTimeout(markSeen,800)}});
+  sub('cars','cars');sub('gallery','gallery');sub('bookings','bdocs',()=>{S.bReady=true;restore()});sub('blocks','blocks');if(S.editor||S.server||S.local)db.doc('admin/notifs').onSnapshot(d=>{S.notifRead=d.exists?(d.data().read||{}):{};if(S.session)renderBell()},()=>{});sub('drivers','drivers');db.doc('settings/main').onSnapshot(d=>{S.settings=d.exists?d.data():null;render()},()=>{});sub('chats','chats',()=>{if(S.view==='messages'){clearTimeout(S.seenT);S.seenT=setTimeout(markSeen,800)}});sub('replies','replies',()=>{if(S.view==='messages'){clearTimeout(S.seenT);S.seenT=setTimeout(markSeen,800)}});
 })();
 }

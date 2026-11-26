@@ -21,6 +21,8 @@
     <a class="brand" href="#fleet"><span class="blogo" id="brandLogo"><svg width="34" height="22" style="color:#fff"><use href="#i-car"/></svg></span><span id="brandName">Car Rental</span></a>
     <button type="button" class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="nav"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path class="l1" d="M3 6h18"/><path class="l2" d="M3 12h18"/><path class="l3" d="M3 18h18"/></svg><span id="menuDot" class="count hide"></span></button>
     <nav id="nav" aria-label="Main"></nav>
+    <div class="notif hide" id="notifWrap"><button type="button" class="bell" id="bellBtn" aria-label="Notifications" aria-expanded="false" aria-controls="nPanel"><svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span class="bcount hide" id="bellCount"></span></button>
+      <div class="npanel" id="nPanel" hidden><div class="nhead"><b>Notifications</b><button type="button" class="btn sm ghost" id="nAll">Mark all as read</button></div><div class="nlist" id="nList"></div></div></div>
     <div class="who"><span id="role">Loading…</span><button class="btn sm hide" id="logout">Log out</button></div>
   </div>
 </header>
@@ -240,7 +242,20 @@
             <div><label for="setEmail">Email</label><input id="setEmail" type="email" placeholder="hello@yourrental.com"></div>
             <div><label for="setAddr">Office address</label><input id="setAddr" placeholder="Street, city"></div>
             <div><label for="setHours">Office hours</label><input id="setHours" placeholder="Mon to Sat, 8 AM to 6 PM"></div>
-            <div><label for="setFb">Facebook page link</label><input id="setFb" type="url" placeholder="https://facebook.com/yourpage"></div>
+            <h3 style="margin-top:6px">Social media and other links</h3>
+            <p class="small">Shown as clickable links under Contact us. Each link must start with https://</p>
+            <div class="two">
+              <div><label for="setFb">Facebook page</label><input id="setFb" type="url" placeholder="https://facebook.com/yourpage"></div>
+              <div><label for="setIg">Instagram</label><input id="setIg" type="url" placeholder="https://instagram.com/yourpage"></div>
+              <div><label for="setTt">TikTok</label><input id="setTt" type="url" placeholder="https://tiktok.com/@yourpage"></div>
+              <div><label for="setYt">YouTube</label><input id="setYt" type="url" placeholder="https://youtube.com/@yourchannel"></div>
+              <div><label for="setX">X (Twitter)</label><input id="setX" type="url" placeholder="https://x.com/yourpage"></div>
+              <div><label for="setWeb">Website</label><input id="setWeb" type="url" placeholder="https://yourwebsite.com"></div>
+            </div>
+            <div class="two">
+              <div><label for="setOtherL">Other link: name</label><input id="setOtherL" maxlength="30" placeholder="e.g. Viber community"></div>
+              <div><label for="setOther">Other link: address</label><input id="setOther" type="url" placeholder="https://"></div>
+            </div>
           </div>
           <div class="card" style="display:grid;gap:10px"><h2>Admin login</h2><p class="small">Change the admin username or password.</p><div><button type="button" class="btn" id="chgAdmin2">Change admin login</button></div></div>
         </div>
@@ -355,9 +370,11 @@
     <div class="dh"><h2 id="carT">Add a car</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
     <div class="db">
       <div class="imgprev" id="cPrev"></div>
-      <div class="two">
-        <div><label for="cImg">Car photo</label><input type="file" id="cImg" accept="image/*"></div>
-        <div style="align-self:end"><button type="button" class="btn danger sm" id="cImgDel">Remove photo</button></div>
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap"><label style="margin:0">Car photos <span class="small" id="cPhotoCount"></span></label><span class="small">All optional</span></div>
+        <p class="hint">Front, back and interior photos help customers choose. The first photo in this order is the main photo on the car card.</p>
+        <input type="file" id="cImg" accept="image/*" class="vh" aria-label="Choose a car photo">
+        <div class="slots" id="cSlots"></div>
       </div>
       <div class="two">
         <div><label for="cBrand">Brand <span class="req">*</span></label><input id="cBrand"></div>
@@ -471,13 +488,29 @@
   </form>
 </dialog>
 
+<!-- Adjust a photo: zoom and position -->
+<dialog id="dCrop" aria-labelledby="crT">
+  <div class="dh"><h2 id="crT">Adjust photo</h2><button type="button" class="x" id="crX" aria-label="Cancel">×</button></div>
+  <div class="db">
+    <p class="small" id="crHint">Drag the photo to move it. Zoom with the slider, the buttons, your mouse wheel, or two fingers.</p>
+    <div class="cropbox" id="crBox"><canvas id="crCv"></canvas><div class="cropgrid" aria-hidden="true"></div></div>
+    <div class="cropctl">
+      <button type="button" class="btn sm" id="crOut" aria-label="Zoom out">−</button>
+      <input type="range" id="crZoom" min="0" max="100" step="0.5" aria-label="Zoom">
+      <button type="button" class="btn sm" id="crIn" aria-label="Zoom in">+</button>
+    </div>
+    <div class="acts" style="justify-content:flex-start"><button type="button" class="btn sm" id="crFill">Fill the frame</button><button type="button" class="btn sm" id="crFit">Show the whole photo</button></div>
+  </div>
+  <div class="df"><span class="small" id="crStep" style="margin-right:auto"></span><button type="button" class="btn" id="crCancel">Cancel</button><button type="button" class="btn go" id="crOk">Use this photo</button></div>
+</dialog>
+
 <!-- Zoom picture -->
 <dialog id="dZoom" aria-labelledby="zT">
   <div class="dh"><h2 id="zT">Driver's license</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
-  <div class="zbody" id="zBody"><img id="zImg" alt=""></div>
+  <div class="zwrap"><div class="zbody" id="zBody"><img id="zImg" alt="" draggable="false"></div><button type="button" class="cg-btn prev hide" id="zPrev" aria-label="Previous photo">‹</button><button type="button" class="cg-btn next hide" id="zNext" aria-label="Next photo">›</button><span class="zlabel hide" id="zLabel"></span></div>
   <p id="zDate"></p>
   <p id="zDesc"></p>
-  <div class="df"><span class="small" style="margin-right:auto">Tap the picture to zoom in or out.</span><button type="button" class="btn" data-close>Close</button></div>
+  <div class="df"><span class="small" style="margin-right:auto" id="zHint">Tap the picture to zoom in or out.</span><button type="button" class="btn" data-close>Close</button></div>
 </dialog>
 
 <!-- Confirm -->
