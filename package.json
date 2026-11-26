@@ -1,0 +1,9 @@
+{
+  "name": "car-rental-system",
+  "version": "1.1.0",
+  "description": "Car rental system with admin and customer sides. Saves data on your computer (run-local.js) or on Vercel (Upstash Redis + Vercel Blob).",
+  "private": true,
+  "scripts": { "start": "node run-local.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "@vercel/blob": "^2.9.0" }
+}

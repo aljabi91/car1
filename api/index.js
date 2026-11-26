@@ -1,0 +1,92 @@
+/*
+ * Car Rental System on Vercel.
+ * Data is saved in Upstash Redis (from the Vercel Marketplace) and photos in Vercel Blob,
+ * because Vercel functions cannot keep files they write.
+ * vercel.json sends every /api/... request here.
+ */
+const crypto = require('crypto');
+const { createApi, SAMPLE_CARS } = require('../lib/core');
+
+const R_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+const R_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+const HASH = 'cr:db';
+
+async function redis(cmd) {
+  const r = await fetch(R_URL, { method: 'POST', headers: { Authorization: `Bearer ${R_TOKEN}` }, body: JSON.stringify(cmd) });
+  const j = await r.json();
+  if (j.error) throw new Error('Redis: ' + j.error);
+  return j.result;
+}
+async function pipeline(cmds) {
+  const r = await fetch(R_URL + '/pipeline', { method: 'POST', headers: { Authorization: `Bearer ${R_TOKEN}` }, body: JSON.stringify(cmds) });
+  const j = await r.json();
+  const bad = Array.isArray(j) ? j.find(x => x.error) : j;
+  if (!Array.isArray(j) || bad) throw new Error('Redis: ' + ((bad && bad.error) || 'pipeline failed'));
+  return j.map(x => x.result);
+}
+
+let seeded = false, secret = process.env.SESSION_SECRET || null;
+const store = {
+  async all() {
+    const flat = (await redis(['HGETALL', HASH])) || [];
+    const out = {};
+    for (let i = 0; i < flat.length; i += 2) { try { out[flat[i]] = JSON.parse(flat[i + 1]); } catch (e) {} }
+    if (!Object.keys(out).length && !seeded) {
+      seeded = true;
+      if (await redis(['SET', 'cr:seeded', '1', 'NX'])) {
+        await pipeline(SAMPLE_CARS.map(([p, d]) => ['HSET', HASH, p, JSON.stringify(d)]));
+        for (const [p, d] of SAMPLE_CARS) out[p] = d;
+      }
+    }
+    return out;
+  },
+  async get(p) { const v = await redis(['HGET', HASH, p]); return v ? JSON.parse(v) : null; },
+  async set(p, d) { await pipeline([['HSET', HASH, p, JSON.stringify(d)], ['INCR', 'cr:ver']]); },
+  async del(p) { await pipeline([['HDEL', HASH, p], ['INCR', 'cr:ver']]); },
+  async version() { return +(await redis(['GET', 'cr:ver'])) || 0; },
+  async secret() {
+    if (secret) return secret;
+    await redis(['SET', 'cr:secret', crypto.randomBytes(32).toString('hex'), 'NX']);
+    secret = await redis(['GET', 'cr:secret']);
+    return secret;
+  },
+  async tooMany(ip) {
+    const key = 'cr:rl:' + String(ip || '?').replace(/[^0-9a-fA-F:.]/g, '') + ':' + Math.floor(Date.now() / 60000);
+    const [n] = await pipeline([['INCR', key], ['EXPIRE', key, 120]]);
+    return n > 10;
+  }
+};
+
+const EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+const photos = {
+  async save(buf, type) {
+    const { put } = require('@vercel/blob');
+    const blob = await put(`car-rental/${crypto.randomBytes(8).toString('hex')}.${EXT[type]}`, buf, { access: 'public', contentType: type });
+    return blob.url;
+  },
+  async remove(id) {
+    if (!/^https:\/\/[a-z0-9.-]+\.blob\.vercel-storage\.com\//i.test(id)) return;
+    const { del } = require('@vercel/blob');
+    await del(id).catch(() => {});
+  }
+};
+
+const api = createApi({ store, photos, live: false });
+
+module.exports = async (req, res) => {
+  res.setHeader('cache-control', 'no-store');
+  const route0 = String((req.query && req.query.route) || '').replace(/^\/+|\/+$/g, '');
+  if (route0 === 'ping') return res.status(200).json({ app: 'car-rental', live: false, ready: !!(R_URL && R_TOKEN), problem: R_URL && R_TOKEN ? '' : 'The database is not connected yet. In Vercel, open this project, go to Storage, add Upstash Redis, then redeploy.' });
+  if (!R_URL || !R_TOKEN) return res.status(500).json({ error: 'The database is not connected yet. In Vercel, add Upstash Redis to this project (Storage tab), then redeploy.', code: 'unavailable' });
+  const route = String((req.query && req.query.route) || new URL(req.url, 'http://x').pathname.replace(/^\/api\/?/, '')).replace(/^\/+|\/+$/g, '');
+  let body = {};
+  if (req.method === 'POST') { try { body = req.body || {}; } catch (e) { return res.status(400).json({ error: 'Bad request.' }); } }
+  try {
+    const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress;
+    const r = await api.handle({ route, method: req.method, token: req.headers['x-token'], ip, body });
+    res.status(r.status).json(r.json);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message || e).startsWith('Redis') ? 'Could not reach the database. Check the Upstash Redis connection in Vercel.' : 'Something went wrong on the server.', code: 'unavailable' });
+  }
+};

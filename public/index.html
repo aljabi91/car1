@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Car Rental System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-seat" viewBox="0 0 24 24"><path d="M8 3h4a2 2 0 0 1 2 2v8h4a2 2 0 0 1 2 2v4H7a2 2 0 0 1-2-2V6a3 3 0 0 1 3-3zM7 21v-2M18 21v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M6 4v16M12 4v16M18 4v8H6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-fuel" viewBox="0 0 24 24"><path d="M5 21V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v16M3 21h13M14 10h2l2 2v5a1.5 1.5 0 0 0 3 0V8l-3-3M8 8h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-car" viewBox="0 0 34 22"><path d="M2 15l2-5q1-2 4-2h4l4-5h9q2 0 3 2l3 4 1 1v5q0 1-1 1H3q-1 0-1-1z" fill="currentColor"/><circle cx="9" cy="17" r="3.5" fill="#2346d1" stroke="currentColor" stroke-width="2"/><circle cx="25" cy="17" r="3.5" fill="#2346d1" stroke="currentColor" stroke-width="2"/></symbol>
+</svg>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#fleet"><svg width="34" height="22" style="color:#fff"><use href="#i-car"/></svg><span>Car Rental</span></a>
+    <nav id="nav" aria-label="Main"></nav>
+    <div class="who"><span id="role">Loading…</span><button class="btn sm hide" id="logout">Log out</button></div>
+  </div>
+</header>
+
+<main>
+  <!-- CUSTOMER DASHBOARD -->
+  <section id="v-fleet" class="view">
+    <div class="hero">
+      <div class="wrap hero-in">
+        <div>
+          <h1>Rent a car for your next trip</h1>
+          <p class="sub">Set your pickup and return dates, choose a car that's free, and send your details. The rental office confirms every request.</p>
+        </div>
+        <form class="ticket" id="searchForm" onsubmit="return false" aria-label="Your rental dates">
+          <div class="stub"><label for="fStart">Pickup</label><input type="datetime-local" id="fStart"><span class="day" id="tStart">—</span><span class="time" id="tStartT"></span></div>
+          <div class="perf" aria-live="polite"><b id="tDays">0</b><span id="tDaysL">days</span></div>
+          <div class="stub"><label for="fEnd">Return</label><input type="datetime-local" id="fEnd"><span class="day" id="tEnd">—</span><span class="time" id="tEndT"></span></div>
+          <div class="quick"><span class="small">Quick picks</span><button type="button" class="chip" data-q="1">Tomorrow, 1 day</button><button type="button" class="chip" data-q="wk">This weekend</button><button type="button" class="chip" data-q="3">3 days</button><button type="button" class="chip" data-q="7">1 week</button></div>
+        </form>
+      </div>
+      <div class="wrap"><ol class="steps" style="color:#fff"><li><b>1</b>Pick your dates</li><li><b>2</b>Choose a free car</li><li><b>3</b>Fill in your details</li><li><b>4</b>Log in to follow your booking</li></ol></div>
+    </div>
+    <div class="wrap">
+      <p class="note" id="fleetNote" style="margin-top:18px"></p>
+      <div class="filters">
+        <div class="chips" id="typeChips" role="group" aria-label="Car type"></div>
+        <div class="seg" id="transSeg" role="group" aria-label="Transmission"><button type="button" class="chip" data-tr="" aria-pressed="true">Any</button><button type="button" class="chip" data-tr="Automatic" aria-pressed="false">Automatic</button><button type="button" class="chip" data-tr="Manual" aria-pressed="false">Manual</button></div>
+        <label class="toggle"><input type="checkbox" id="fFree" checked>Only free cars</label>
+        <input class="fsearch" id="fQ" placeholder="Search brand, model or plate" aria-label="Search cars">
+      </div>
+      <p class="count-line" id="countLine"></p>
+      <div class="grid" id="fleetGrid"></div>
+    </div>
+    <div class="band">
+      <div class="wrap">
+        <div class="bandhead">
+          <div><h2>On the road with our renters</h2><p class="sub">Photos from the rental office of customers with their cars.</p></div>
+          <div class="acts" id="stripNav"><button class="btn sm" id="sPrev" aria-label="Previous photos">‹</button><button class="btn sm" id="sNext" aria-label="Next photos">›</button></div>
+        </div>
+        <div class="strip" id="strip" tabindex="0" aria-label="Renter photos"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CUSTOMER: MY BOOKINGS -->
+  <section id="v-my-bookings" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1>My bookings</h1><p class="sub">Each booking shows how far along it is.</p></div><a class="btn go" href="#fleet">Book another car</a></div>
+      <p class="note" style="margin-bottom:16px" id="cancelBanner"></p>
+      <div class="mine" id="mineList"></div>
+    </div>
+  </section>
+
+  <!-- LOGIN -->
+  <section id="v-login" class="view hide">
+    <div class="wrap login">
+      <div class="lcard">
+        <div><h1 style="font-size:36px">Log in</h1><p class="sub" style="margin-top:6px">One login for customers and the rental office.</p></div>
+        <p class="okmsg" id="lMsg"></p>
+        <form id="loginForm" novalidate>
+          <div><label for="lName">Full name</label><input id="lName" autocomplete="username" placeholder="Juan Dela Cruz"><p class="hint">Admin: use your admin username.</p></div>
+          <div><label for="lPass">Password</label><div class="pw"><input id="lPass" type="password" autocomplete="current-password" placeholder="Last 4 digits of your mobile"><button type="button" class="btn sm ghost" id="lShow">Show</button></div><p class="hint">Customers: for 0917 123 4567, the password is 4567.</p></div>
+          <p class="err" id="lErr" role="alert"></p>
+          <button class="btn go lg" id="lBtn" style="width:100%">Log in</button>
+        </form>
+        <p class="small">New customer? <a href="#fleet">Choose a car</a> and fill in the booking form first. You log in with the name and mobile number from that form.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ADMIN: RENTALS -->
+  <section id="v-bookings" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1>Rentals</h1><p class="sub">Everyone who has booked, with their details. Open a booking to mark pickup or return.</p></div><button class="btn" id="chgAdmin">Change admin login</button></div>
+      <div class="stats" id="stats"></div>
+      <div class="pend hide" id="pendBox"><h2 id="pendT">Waiting for your answer</h2><div id="pendList"></div></div>
+      <div class="cols">
+        <div>
+          <h2>All bookings</h2>
+          <div class="chips" id="stChips" style="margin-top:8px"></div>
+          <div class="tools"><input id="admQ" placeholder="Search name, phone, plate or reference" aria-label="Search bookings"></div>
+          <div class="scroll"><table class="stack" id="bkTable"><thead><tr><th>Ref</th><th>Customer</th><th>Car</th><th>Dates</th><th class="num">Total</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+          <div class="empty hide" id="bkEmpty"></div>
+        </div>
+        <aside class="card">
+          <h3>Days booked this month</h3>
+          <p class="small" style="margin:2px 0 14px" id="utilSub"></p>
+          <div class="bars" id="util"></div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- MESSAGES (both sides) -->
+  <section id="v-messages" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1 id="msgTitle">Messages</h1><p class="sub" id="msgSub"></p></div></div>
+      <div class="chat" id="chat">
+        <div class="threads" id="threads" aria-label="Conversations"></div>
+        <div class="conv">
+          <div class="convh" id="convh"></div>
+          <div class="msgs" id="msgs" aria-live="polite"></div>
+          <form class="compose" id="compose"><label for="msgIn" class="hide">Message</label><textarea id="msgIn" placeholder="Write a message"></textarea><button class="btn go" id="msgSend">Send</button></form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CUSTOMER: MY DETAILS -->
+  <section id="v-my-details" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1>My details</h1><p class="sub">Keep your details up to date. They fill in your next booking form automatically and the office sees the new details on all your bookings.</p></div></div>
+      <form class="lcard" id="detForm" novalidate style="width:min(620px,100%)">
+        <p class="okmsg" id="pMsgOk"></p>
+        <div><label for="pName">Full name <span class="req">*</span></label><input id="pName" autocomplete="name"><p class="hint">This is also your login name.</p></div>
+        <div class="two">
+          <div><label for="pPhone">Mobile number <span class="req">*</span></label><input id="pPhone" type="tel" autocomplete="tel"><p class="hint">Its last 4 digits are your password.</p></div>
+          <div><label for="pEmail">Email</label><input id="pEmail" type="email" autocomplete="email"></div>
+        </div>
+        <div><label for="pAddr">Address <span class="req">*</span></label><textarea id="pAddr" autocomplete="street-address"></textarea></div>
+        <div class="two">
+          <div><label for="pLic">Driver's license no. <span class="req">*</span></label><input id="pLic"></div>
+          <div><label for="pEmer">Emergency contact</label><input id="pEmer" placeholder="Name and number"></div>
+        </div>
+        <p class="note" id="pWarn"></p>
+        <p class="err" id="pErr" role="alert"></p>
+        <div class="acts" style="justify-content:flex-start"><button class="btn go" id="pSave">Save changes</button><button type="button" class="btn" id="pReset">Undo changes</button></div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ADMIN: CUSTOMERS -->
+  <section id="v-customers" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1>Customers</h1><p class="sub">Everyone who has rented or asked to rent, with their contact details and totals.</p></div></div>
+      <div class="tools"><input id="custQ" placeholder="Search name, mobile or email" aria-label="Search customers"></div>
+      <div class="scroll"><table class="stack" id="custTable"><thead><tr><th>Customer</th><th>Mobile</th><th>Address</th><th class="num">Rentals</th><th class="num">Total spent</th><th>Last rental</th><th></th></tr></thead><tbody></tbody></table></div>
+      <div class="empty hide" id="custEmpty"><b>No customers yet</b><span>People who book a car will show up here.</span></div>
+    </div>
+  </section>
+
+  <!-- ADMIN: DRIVERS -->
+  <section id="v-drivers" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1>Drivers</h1><p class="sub">Drivers you can send with customers who book "with a driver". Assign them from a booking.</p></div><button class="btn go" id="addDrv">Add a driver</button></div>
+      <p class="note" id="drvNeed" style="margin-bottom:16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"></p>
+      <div id="drvList"></div>
+    </div>
+  </section>
+
+  <!-- ADMIN: SETTINGS -->
+  <section id="v-settings" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1>Settings</h1><p class="sub">Prices and rules customers see when they book. Changes apply to new bookings; existing bookings keep their price.</p></div></div>
+      <div class="cols" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)">
+        <div class="card" style="display:grid;gap:12px">
+          <h2>Extras</h2>
+          <p class="small">Tick "Includes a driver" for extras where the office sends a driver. Those bookings ask you to assign one.</p>
+          <div id="exRows"></div>
+          <div><button type="button" class="btn" id="exAdd">Add an extra</button></div>
+        </div>
+        <div style="display:grid;gap:16px">
+          <div class="card" style="display:grid;gap:12px">
+            <h2>Fees and rules</h2>
+            <div><label for="setDel">Delivery fee (₱)</label><input id="setDel" type="number" min="0" step="50"></div>
+            <div><label for="setCancel">Customers can cancel up to this many days before pickup</label><input id="setCancel" type="number" min="0" max="60" step="1"></div>
+          </div>
+          <div class="card" style="display:grid;gap:10px"><h2>Admin login</h2><p class="small">Change the admin username or password.</p><div><button type="button" class="btn" id="chgAdmin2">Change admin login</button></div></div>
+        </div>
+      </div>
+      <div class="acts" style="justify-content:flex-start;margin-top:18px"><button class="btn go lg" id="setSave">Save settings</button><button type="button" class="btn" id="setUndo">Undo changes</button><span class="err" id="setMsg"></span></div>
+    </div>
+  </section>
+
+  <!-- ADMIN: FLEET -->
+  <section id="v-cars" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1>Fleet</h1><p class="sub">Change a price or photo right here, or open a car to edit all its details.</p></div><button class="btn go" id="addCar">Add a car</button></div>
+      <div id="carList"></div>
+    </div>
+  </section>
+
+  <!-- ADMIN: PHOTOS -->
+  <section id="v-photos" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1>Renter photos</h1><p class="sub">Photos you upload here show on every customer's dashboard.</p></div></div>
+      <div class="drop" id="dropZone">
+        <div class="two">
+          <div><label for="pFiles">Photos <span class="req">*</span></label><input type="file" id="pFiles" accept="image/*" multiple><p class="hint">Choose files or drop them on this box.</p></div>
+          <div><label for="pCap">Caption</label><input id="pCap" placeholder="Ana and family, Baguio trip"></div>
+        </div>
+        <div class="acts" style="justify-content:flex-start"><button class="btn go" id="pUp">Upload photos</button><span class="small" id="pMsg"></span></div>
+      </div>
+      <div class="pgrid" id="pGrid"></div>
+    </div>
+  </section>
+</main>
+
+<!-- Booking wizard -->
+<dialog id="dBook" aria-labelledby="bkTitle">
+  <form id="bookForm" novalidate>
+    <div class="dh"><h2 id="bkTitle">Book this car</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+    <ol class="wsteps" id="wsteps"><li data-s="1">1 Dates and extras</li><li data-s="2">2 Your details</li><li data-s="3">3 Check and send</li></ol>
+    <div class="db">
+      <div class="wp" data-p="1">
+        <div style="display:grid;gap:16px">
+          <div class="mini" id="bkCar"></div>
+          <div class="two">
+            <div><label for="bStart">Pickup <span class="req">*</span></label><input type="datetime-local" id="bStart"></div>
+            <div><label for="bEnd">Return <span class="req">*</span></label><input type="datetime-local" id="bEnd"></div>
+          </div>
+          <div><label for="bPick">How you get the car</label><select id="bPick"><option value="office">Pick up at the office</option><option value="delivery">Deliver to my address (+₱500)</option></select></div>
+          <div><label>Extras</label><div class="extras" id="bExtras"></div></div>
+          <div class="summary" id="bSum"></div>
+        </div>
+      </div>
+      <div class="wp hide" data-p="2">
+        <div style="display:grid;gap:14px">
+          <div><label for="bName">Full name <span class="req">*</span></label><input id="bName" autocomplete="name"><p class="hint">You'll use this name to log in.</p></div>
+          <div class="two">
+            <div><label for="bPhone">Mobile number <span class="req">*</span></label><input id="bPhone" type="tel" autocomplete="tel" placeholder="0917 123 4567"><p class="hint">Its last 4 digits become your password.</p></div>
+            <div><label for="bEmail">Email</label><input id="bEmail" type="email" autocomplete="email"></div>
+          </div>
+          <div><label for="bAddr">Address <span class="req">*</span></label><textarea id="bAddr" autocomplete="street-address" placeholder="House no., street, barangay, city, province"></textarea></div>
+          <div class="two">
+            <div><label for="bLic">Driver's license no. <span class="req">*</span></label><input id="bLic" placeholder="N01-23-456789"></div>
+            <div><label for="bEmer">Emergency contact</label><input id="bEmer" placeholder="Name and number"></div>
+          </div>
+          <div><label for="bNotes">Notes for the office</label><textarea id="bNotes" placeholder="Flight number, destination, special requests"></textarea></div>
+        </div>
+      </div>
+      <div class="wp hide" data-p="3">
+        <div style="display:grid;gap:16px">
+          <dl class="kv" id="bReview"></dl>
+          <div class="summary" id="bSum3"></div>
+          <p class="note" id="bPolicy"></p>
+          <label class="check"><input type="checkbox" id="bAgree"><span id="bAgreeT">My details are correct, I'll bring my driver's license and one government ID at pickup, and I understand that I can only cancel up to 2 days before pickup.</span></label>
+        </div>
+      </div>
+      <p class="err" id="bErr" role="alert"></p>
+    </div>
+    <div class="df"><div class="wtot" id="wTot"></div><button type="button" class="btn" id="wBack">Back</button><button class="btn go" id="wNext">Next</button></div>
+  </form>
+</dialog>
+
+<!-- Booking done (logged-in customer) -->
+<dialog id="dDone" aria-labelledby="doneT">
+  <div class="dh"><h2 id="doneT">Request sent</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+  <div class="db" id="doneBody"></div>
+  <div class="df"><a class="btn go" href="#my-bookings" data-close>See my bookings</a></div>
+</dialog>
+
+<!-- Car editor -->
+<dialog id="dCar" aria-labelledby="carT">
+  <form id="carForm" novalidate>
+    <div class="dh"><h2 id="carT">Add a car</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+    <div class="db">
+      <div class="imgprev" id="cPrev"></div>
+      <div class="two">
+        <div><label for="cImg">Car photo</label><input type="file" id="cImg" accept="image/*"></div>
+        <div style="align-self:end"><button type="button" class="btn danger sm" id="cImgDel">Remove photo</button></div>
+      </div>
+      <div class="two">
+        <div><label for="cBrand">Brand <span class="req">*</span></label><input id="cBrand"></div>
+        <div><label for="cName">Model <span class="req">*</span></label><input id="cName"></div>
+      </div>
+      <div class="three">
+        <div><label for="cYear">Year</label><input id="cYear" type="number" min="1990" max="2035"></div>
+        <div><label for="cType">Type</label><select id="cType"></select></div>
+        <div><label for="cSeats">Seats</label><input id="cSeats" type="number" min="1" max="30"></div>
+      </div>
+      <div class="three">
+        <div><label for="cTrans">Transmission</label><select id="cTrans"><option>Automatic</option><option>Manual</option></select></div>
+        <div><label for="cFuel">Fuel</label><select id="cFuel"><option>Gasoline</option><option>Diesel</option><option>Hybrid</option><option>Electric</option></select></div>
+        <div><label for="cColor">Colour (for the drawing)</label><input id="cColor" type="color" value="#c0392b" style="padding:4px"></div>
+      </div>
+      <div class="three">
+        <div><label for="cRate">Price per day (₱) <span class="req">*</span></label><input id="cRate" type="number" min="0" step="50"></div>
+        <div><label for="cDep">Security deposit (₱)</label><input id="cDep" type="number" min="0" step="500"></div>
+        <div><label for="cPlate">Plate no.</label><input id="cPlate" placeholder="NAB 1234"></div>
+      </div>
+      <div><label for="cDesc">Description</label><textarea id="cDesc"></textarea></div>
+      <div><label for="cStatus">Listing status</label><select id="cStatus"><option value="available">Available to rent</option><option value="maintenance">Under maintenance (shown, can't be booked)</option><option value="hidden">Hidden from customers</option></select></div>
+      <p class="err" id="cErr" role="alert"></p>
+    </div>
+    <div class="df"><button type="button" class="btn danger" id="cDel">Delete car</button><span style="flex:1"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn go" id="cSave">Save car</button></div>
+  </form>
+</dialog>
+
+<!-- Booking detail (admin) -->
+<dialog id="dDet" aria-labelledby="detT">
+  <div class="dh"><h2 id="detT">Booking</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+  <div class="db" id="detBody"></div>
+  <div class="df" id="detActs"></div>
+</dialog>
+
+<!-- Driver editor -->
+<dialog id="dDrv" aria-labelledby="drvT">
+  <form id="drvForm" novalidate>
+    <div class="dh"><h2 id="drvT">Add a driver</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+    <div class="db">
+      <div><label for="dName">Full name <span class="req">*</span></label><input id="dName"></div>
+      <div class="two">
+        <div><label for="dPhone">Mobile number <span class="req">*</span></label><input id="dPhone" type="tel" placeholder="0917 123 4567"></div>
+        <div><label for="dLic">Driver's license no. <span class="req">*</span></label><input id="dLic"></div>
+      </div>
+      <div class="two">
+        <div><label for="dStatus">Status</label><select id="dStatus"><option value="available">Available</option><option value="off">Off duty (can't be assigned)</option></select></div>
+        <div><label for="dImgIn">Photo</label><input type="file" id="dImgIn" accept="image/*"></div>
+      </div>
+      <div><label for="dNotes">Notes</label><input id="dNotes" placeholder="e.g. Knows Baguio and Tagaytay routes"></div>
+      <p class="err" id="dErr" role="alert"></p>
+    </div>
+    <div class="df"><button type="button" class="btn" data-close>Cancel</button><button class="btn go" id="dSave">Save driver</button></div>
+  </form>
+</dialog>
+
+<!-- Change booking (admin) -->
+<dialog id="dEdit" aria-labelledby="edT">
+  <form id="editForm" novalidate>
+    <div class="dh"><h2 id="edT">Change booking</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+    <div class="db">
+      <p class="small" id="eWho"></p>
+      <div><label for="eCar">Car</label><select id="eCar"></select></div>
+      <div class="two">
+        <div><label for="eStart">Pickup <span class="req">*</span></label><input type="datetime-local" id="eStart"></div>
+        <div><label for="eEnd">Return <span class="req">*</span></label><input type="datetime-local" id="eEnd"></div>
+      </div>
+      <div><label for="ePick">How they get the car</label><select id="ePick"><option value="office">Pick up at the office</option><option value="delivery">Deliver to their address (+₱500)</option></select></div>
+      <div><label>Extras</label><div class="extras" id="eExtras"></div></div>
+      <div id="eDrvBox"><label for="eDrv">Driver for this trip</label><select id="eDrv"></select></div>
+      <div class="summary" id="eSum"></div>
+      <p class="note" id="eClash"></p>
+      <label class="check"><input type="checkbox" id="eTell" checked>Tell the customer about the change in Messages</label>
+      <p class="err" id="eErr" role="alert"></p>
+    </div>
+    <div class="df"><button type="button" class="btn" data-close>Cancel</button><button class="btn go" id="eSave">Save changes</button></div>
+  </form>
+</dialog>
+
+<!-- Admin login setup -->
+<dialog id="dSetup" aria-labelledby="setT">
+  <form id="setupForm" novalidate>
+    <div class="dh"><h2 id="setT">Admin login</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+    <div class="db">
+      <p class="small" id="sNow"></p>
+      <div><label for="sName">Admin username <span class="req">*</span></label><input id="sName" autocomplete="username"></div>
+      <div><label for="sCur">Current password <span class="req">*</span></label><input id="sCur" type="password" autocomplete="current-password"></div>
+      <div class="two">
+        <div><label for="sPhone">New password <span class="req">*</span></label><input id="sPhone" type="password" autocomplete="new-password"><p class="hint">At least 6 characters.</p></div>
+        <div><label for="sPhone2">Type the new password again <span class="req">*</span></label><input id="sPhone2" type="password" autocomplete="new-password"></div>
+      </div>
+      <p class="err" id="sErr" role="alert"></p>
+    </div>
+    <div class="df"><button type="button" class="btn" data-close>Cancel</button><button class="btn go" id="sSave">Save admin login</button></div>
+  </form>
+</dialog>
+
+<!-- Confirm -->
+<dialog id="dAsk" aria-labelledby="askT">
+  <div class="dh"><h2 id="askT">Are you sure?</h2></div>
+  <div class="db"><p id="askMsg"></p></div>
+  <div class="df"><button class="btn" id="askNo">Keep it</button><button class="btn go" id="askYes">Yes</button></div>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
