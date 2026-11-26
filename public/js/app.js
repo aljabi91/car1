@@ -6,7 +6,31 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const peso=n=>'₱'+Math.round(Number(n)||0).toLocaleString('en-PH');
 const TYPES=['Sedan','Hatchback','SUV','MPV / Van','Pickup'];
 const DEF_SET={extras:[{id:'driver',label:'With a driver',perDay:1500,driver:true},{id:'seat',label:'Child car seat',perDay:200,driver:false},{id:'xdriver',label:'Additional driver on the contract',perDay:300,driver:false}],delivery:500,cancelDays:2};
-const SET=()=>{const x=S.settings||{};return{contact:x.contact&&typeof x.contact==='object'?x.contact:{},siteName:String(x.siteName||'').trim()||'Car Rental',logoId:x.logoId||'',extras:Array.isArray(x.extras)?x.extras:DEF_SET.extras,delivery:Number.isFinite(+x.delivery)&&x.delivery!==undefined?+x.delivery:DEF_SET.delivery,cancelDays:Number.isFinite(+x.cancelDays)&&x.cancelDays!==undefined?+x.cancelDays:DEF_SET.cancelDays}};
+const DEF_TERMS=`# Who can rent
+- The renter must be at least 21 years old and hold a valid driver's license.
+- Bring your driver's license and one valid government ID when you pick up the car.
+
+# Booking and payment
+- A booking is confirmed only after the office approves it.
+- The rental price and security deposit are shown on your booking. The deposit is paid at pickup and returned after the car is checked on return, less any charges below.
+
+# Pickup and return
+- The car is checked together with the renter at pickup and at return. Photos of the car and the signed rental agreement are kept as a record and shown on your booking.
+- Return the car on the agreed date and time, clean and with the same fuel level. Late returns may be charged for the extra time.
+
+# Use of the car
+- Only the renter and the drivers named in the rental agreement may drive the car.
+- No smoking, no illegal use, and no trips outside the agreed area without the office's permission.
+- Traffic violations, tolls and parking fees during the rental are paid by the renter.
+
+# Damage, loss and accidents
+- Report any accident, damage or breakdown to the office right away.
+- The renter pays for damage or loss during the rental that is not covered by insurance, as stated in the signed rental agreement.
+
+# Cancellation
+- You can cancel online up to the number of days before pickup shown on your booking. After that, message the office.`;
+const SET=()=>{const x=S.settings||{};return{contact:x.contact&&typeof x.contact==='object'?x.contact:{},siteName:String(x.siteName||'').trim()||'Car Rental',logoId:x.logoId||'',extras:Array.isArray(x.extras)?x.extras:DEF_SET.extras,delivery:Number.isFinite(+x.delivery)&&x.delivery!==undefined?+x.delivery:DEF_SET.delivery,cancelDays:Number.isFinite(+x.cancelDays)&&x.cancelDays!==undefined?+x.cancelDays:DEF_SET.cancelDays,terms:typeof x.terms==='string'?x.terms:DEF_TERMS,termsAt:+x.termsAt||0}};
+const hasTerms=()=>!!SET().terms.trim();
 const EX=()=>SET().extras;
 const cdTxt=()=>plural(SET().cancelDays,'day');
 const needsDriver=b=>(b.extrasDetail||[]).some(x=>x.driver)||(b.extras||[]).includes('With a driver');
@@ -15,7 +39,7 @@ const STS={pending:'Pending',approved:'Approved',active:'Picked up',completed:'R
 const LIVE=['pending','approved','active'];
 const cancelBy=b=>new Date(+new Date(b.start)-SET().cancelDays*864e5);
 const canCancelNow=b=>['pending','approved'].includes(b.status)&&Date.now()<+cancelBy(b);
-const S={db:null,user:null,assets:null,uid:null,admin:false,editor:false,session:null,adminCfg:null,cfgLoaded:false,bReady:false,canWrite:true,ready:false,cars:[],gallery:[],bdocs:[],blocks:[],notifRead:null,licCache:{},drivers:[],settings:null,chats:[],replies:[],thread:null,draft:'',local:false,adm:{status:'all',q:''},f:{type:'',trans:''},editing:null,newImg:null,dropImg:false,booking:null,step:1};
+const S={db:null,user:null,assets:null,uid:null,admin:false,editor:false,session:null,adminCfg:null,cfgLoaded:false,bReady:false,canWrite:true,ready:false,cars:[],gallery:[],bdocs:[],blocks:[],notifRead:null,pfCache:{},licCache:{},drivers:[],settings:null,chats:[],replies:[],thread:null,draft:'',local:false,adm:{status:'all',q:''},f:{type:'',trans:''},editing:null,newImg:null,dropImg:false,booking:null,step:1};
 
 /* ---------- helpers ---------- */
 const pad=n=>String(n).padStart(2,'0');
@@ -112,7 +136,10 @@ const CUST=[['fleet','Cars'],['my-bookings','My bookings'],['messages','Messages
 const ADM=[['bookings','Rentals'],['customers','Customers'],['messages','Messages'],['cars','Fleet'],['drivers','Drivers'],['photos','Recent activity'],['reports','Reports'],['settings','Settings'],['fleet','Customer view']];
 const ACT_VIEWS=['fleet','my-bookings','my-details'];
 const GUEST=[['fleet','Cars'],['login','Log in']];
-function navItems(){return S.session?.role==='admin'?ADM:S.session?CUST:GUEST}
+function navItems(){const t=hasTerms();
+  if(S.session?.role==='admin')return[...ADM.slice(0,-1),['terms','Terms'],ADM.at(-1)];
+  if(S.session)return t?[...CUST,['terms','Terms and conditions']]:CUST;
+  return t?[GUEST[0],['terms','Terms and conditions'],GUEST[1]]:GUEST}
 function route(){
   const items=navItems();let h=location.hash.slice(1);
   if(!items.some(i=>i[0]===h))h=items[0][0];
@@ -134,7 +161,7 @@ function route(){
 addEventListener('hashchange',route);
 function fitHeader(){const top=$('.top');top.classList.remove('compact');
   const nav=$('#nav'),brand=$('.brand'),who=$('.top .who');
-  const wraps=innerWidth<=1000||nav.offsetTop>brand.offsetTop+8||who.offsetTop>brand.offsetTop+8;
+  const wraps=innerWidth<=1000||nav.offsetTop>brand.offsetTop+8||(who.offsetWidth>0&&who.offsetTop>brand.offsetTop+8);
   top.classList.toggle('compact',wraps);if(!wraps)closeMenu()}
 addEventListener('resize',()=>{clearTimeout(S.fitT);S.fitT=setTimeout(fitHeader,60)});
 function closeMenu(){$('.top').classList.remove('open');$('#menuBtn').setAttribute('aria-expanded','false');$('#menuBtn').setAttribute('aria-label','Open menu')}
@@ -216,7 +243,9 @@ function renderMine(){
       ${needsDriver(b)&&!['rejected','cancelled'].includes(b.status)?`<div><b>Your driver:</b> ${b.driverName?`${esc(b.driverName)}, ${esc(b.driverPhone||'')}`:'<span class="small">the office will assign a driver and tell you here.</span>'}</div>`:''}
       ${(b.changes||[]).length?`<p class="okmsg" style="margin-top:6px;font-weight:500"><b>Changed by the office on ${esc(tAt(b.changes.at(-1).at))}:</b> ${esc(b.changes.at(-1).what)}</p>`:''}
       ${b.adminNote?`<p class="note" style="margin-top:6px"><b>Comment from the office:</b> ${esc(b.adminNote)}</p>`:''}
+      ${['pickup','ret'].filter(sd=>hasHand(b,sd)).map(sd=>{const h=b.handover[sd];return`<div class="handc"><div><b>${HSIDE[sd][2]}</b>${h.updatedAt?` <span class="small">· ${esc(tAt(h.updatedAt))}</span>`:''}</div>${(h.files||[]).length?`<div class="pfgrid sm">${pfThumbs(S.uid,b,sd,false)}</div>`:''}${h.comment?`<p class="small" style="margin:0;color:var(--ink)"><b>Office comments:</b> ${esc(h.comment)}</p>`:''}</div>`}).join('')}
     </div><div class="acts"><button class="btn sm" data-askbk="${esc(b.ref)}">Ask about this booking</button>${canCancel?`<button class="btn sm danger" data-cancel="${esc(b.id)}">Cancel booking</button>`:''}</div>${open?`<p class="small" style="grid-column:1/-1;margin:0">${canCancel?`You can cancel until ${esc(fmt(toLocal(cancelBy(b))))}.`:`The ${esc(cdTxt())} cancellation period has passed. To change or cancel, message the office.`}</p>`:''}</article>`}).join('');
+  fillPfImgs(el);
 }
 
 /* ---------- render: admin ---------- */
@@ -316,15 +345,46 @@ function renderMessages(){
   $('#compose').classList.remove('hide');
   const me=adm?'a':'c';
   const box=$('#msgs');const atEnd=box.scrollHeight-box.scrollTop-box.clientHeight<40;
-  box.innerHTML=t.msgs.length?t.msgs.map(m=>`<div class="msg${m.from===me?' me':''}">${esc(m.text)}<time>${m.from===me?'You':adm?esc(t.name||'Customer'):'Rental office'}, ${esc(tAt(m.at))}</time></div>`).join(''):`<div class="empty" style="margin:auto">${adm?'No messages yet. Write the first one below.':'No messages yet. Write to the office below.'}</div>`;
+  if(S.editMsg&&!t.msgs.some(m=>m.from===me&&m.id===S.editMsg))S.editMsg=null;
+  const ed=$('#msgEdit');if(ed)S.editDraft=ed.value;
+  box.innerHTML=t.msgs.length?t.msgs.map(m=>{const mine=m.from===me;const who=mine?'You':adm?esc(t.name||'Customer'):'Rental office';const tm=`<time>${who}, ${esc(tAt(m.at))}${m.edited?' · Edited':''}</time>`;
+    if(mine&&m.id&&S.editMsg===m.id)return`<div class="msg me editing"><label for="msgEdit" class="hide">Edit your message</label><textarea id="msgEdit">${esc(S.editDraft??m.text)}</textarea><div class="macts"><button type="button" class="mcancel" data-mcancel>Cancel</button><button type="button" class="msave" data-msave="${esc(m.id)}">Save</button></div></div>`;
+    return`<div class="msg${mine?' me':''}">${esc(m.text)}${tm}${mine&&m.id?`<div class="macts"><button type="button" data-medit="${esc(m.id)}">Edit</button><button type="button" data-mdel="${esc(m.id)}">Delete</button></div>`:''}</div>`}).join(''):`<div class="empty" style="margin:auto">${adm?'No messages yet. Write the first one below.':'No messages yet. Write to the office below.'}</div>`;
   if(atEnd||!S.msgScrolled){box.scrollTop=box.scrollHeight;S.msgScrolled=true}
   if(S.draft){$('#msgIn').value=S.draft;S.draft='';$('#msgIn').focus()}
+  const ne=$('#msgEdit');if(ne&&S.editFocus){S.editFocus=false;ne.focus();ne.setSelectionRange(ne.value.length,ne.value.length)}
   clearTimeout(S.seenT);S.seenT=setTimeout(markSeen,800);
 }
 $('#compose').addEventListener('submit',async e=>{
   e.preventDefault();const v=$('#msgIn').value.trim();if(!v)return;
   const b=$('#msgSend');b.disabled=true;
   try{await sendMsg(v);$('#msgIn').value='';S.msgScrolled=false;renderMessages()}catch(x){toast('Message not sent. Try again.')}finally{b.disabled=false}
+});
+async function changeMyMsg(id,fn){
+  if(S.admin){const t=S.thread;await writeThread('replies',t.owner,t.key,x=>({...x,msgs:fn(x.msgs||[])}))}
+  else await writeThread('chats',S.uid,myKey(),x=>({...x,msgs:fn(x.msgs||[])}));
+}
+async function saveEditMsg(id){
+  const v=($('#msgEdit')?.value||'').trim();
+  if(!v){toast('The message is empty. Write something, or use Delete.');return}
+  const b=$('[data-msave]');if(b)b.disabled=true;
+  try{await changeMyMsg(id,ms=>ms.map(m=>m.id===id?(m.text===v?m:{...m,text:v,edited:true,editedAt:Date.now()}):m));S.editMsg=null;S.editDraft=null;renderMessages();toast('Message updated')}
+  catch(x){toast('Message not updated. Try again.');if(b)b.disabled=false}
+}
+$('#msgs').addEventListener('click',async e=>{
+  const t=e.target;
+  const ed=t.closest('[data-medit]');if(ed){S.editMsg=ed.dataset.medit;S.editDraft=null;S.editFocus=true;renderMessages();return}
+  if(t.closest('[data-mcancel]')){S.editMsg=null;S.editDraft=null;renderMessages();return}
+  const sv=t.closest('[data-msave]');if(sv){saveEditMsg(sv.dataset.msave);return}
+  const dl=t.closest('[data-mdel]');if(dl){
+    if(!await ask(S.admin?'Delete this message? The customer will no longer see it.':'Delete this message? The office will no longer see it.','Delete'))return;
+    try{await changeMyMsg(dl.dataset.mdel,ms=>ms.filter(m=>m.id!==dl.dataset.mdel));renderMessages();toast('Message deleted')}catch(x){toast('Message not deleted. Try again.')}
+  }
+});
+$('#msgs').addEventListener('keydown',e=>{
+  if(!e.target.closest('.msg.editing'))return;
+  if(e.key==='Escape'){e.preventDefault();S.editMsg=null;S.editDraft=null;renderMessages()}
+  else if(e.key==='Enter'&&!e.shiftKey&&e.target.id==='msgEdit'){e.preventDefault();const b=$('[data-msave]');if(b)saveEditMsg(b.dataset.msave)}
 });
 $('#msgIn').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('#compose').requestSubmit()}});
 document.addEventListener('visibilitychange',markSeen);
@@ -389,6 +449,7 @@ function render(){
   if(v==='my-details')renderDetails();
   if(v==='drivers')renderDrivers();
   if(v==='settings')renderSettings();
+  if(v==='terms')renderTerms();
   if(v==='reports')renderReports();
 }
 
@@ -405,7 +466,7 @@ function openBooking(carId){
   $('#bStart').min=$('#bEnd').min=toLocal(new Date());
   $('#bPick').options[1].textContent=`Deliver to my address (+${peso(SET().delivery)})`;
   $('#bExtras').innerHTML=EX().map(x=>`<label class="opt"><input type="checkbox" data-x="${x.id}">${esc(x.label)}<span>+${esc(peso(x.perDay))} a day</span></label>`).join('');
-  $('#bAgree').checked=false;$('#bNotes').value='';$('#bPick').value='office';
+  $('#bAgree').checked=false;$('#bTerms').checked=false;$('#bTermsRow').classList.toggle('hide',!hasTerms());$('#bNotes').value='';$('#bPick').value='office';
   step(1);$('#dBook').showModal();
 }
 function calc(){
@@ -437,6 +498,7 @@ function stepError(n){
     if(!v('#bAddr'))return['#bAddr','Enter your address.'];
     if(!S.licImg&&!S.licOnFile)return['#bLicFile',"Upload a photo of your driver's license."];
   }
+  if(n===3&&hasTerms()&&!$('#bTerms').checked)return['#bTerms','Tick the box to agree to the Terms and conditions.'];
   if(n===3&&!$('#bAgree').checked)return['#bAgree','Tick the box to confirm your details.'];
   return'';
 }
@@ -464,6 +526,7 @@ $('#bookForm').addEventListener('submit',async e=>{
   const btn=$('#wNext');btn.disabled=true;btn.textContent='Sending…';
   const nm=v('#bName').replace(/\s+/g,' ');const prev=ownItems().find(x=>norm(x.name)===norm(nm)&&last4(x.phone)===last4(v('#bPhone')));
   const b={id:uid(),ref:ref(),cid:S.session?.role==='customer'&&isMine({name:nm,phone:v('#bPhone')})?S.session.cid:prev?cidOf(prev):tk(norm(nm),last4(v('#bPhone'))),carId:k.c.id,carName:carTitle(k.c),plate:k.c.plate||'',name:v('#bName').replace(/\s+/g,' '),phone:v('#bPhone'),email:v('#bEmail'),address:v('#bAddr'),hasLicense:true,emergency:v('#bEmer'),start:k.s,end:k.e,days:k.n,rate:+k.c.rate,extras:k.ex.map(x=>x.label),extrasDetail:k.ex.map(x=>({label:x.label,perDay:+x.perDay||0,driver:!!x.driver})),extrasPerDay:k.exDay,pickup:$('#bPick').value,delivery:k.del,total:k.total,deposit:+k.c.deposit||0,notes:v('#bNotes'),status:'pending',createdAt:Date.now()};
+  if(hasTerms())b.termsAgreedAt=Date.now();
   try{
     if(S.server){const r=await S.db.book({...b,tz:new Date().getTimezoneOffset(),licenseImg:S.licImg||''});Object.assign(b,r.booking)}
     else{if(S.licImg)await licSave(S.uid,b.cid,S.licImg);await saveOwner(S.uid,[...ownItems(),b])}
@@ -507,14 +570,34 @@ function openDetail(owner,id){
   ${clash.length?`<p class="note">Overlaps an approved booking for this car, ${esc(fmt(clash[0].start))} to ${esc(fmt(clash[0].end))}.</p>`:''}
   <dl class="kv"><dt>Full name</dt><dd>${esc(b.name)}</dd><dt>Mobile</dt><dd>${esc(b.phone)}</dd><dt>Email</dt><dd>${esc(b.email||'—')}</dd><dt>Address</dt><dd>${esc(b.address)}</dd><dt>Driver's license</dt><dd id="detLic"><span class="small">Loading photo…</span></dd><dt>Emergency contact</dt><dd>${esc(b.emergency||'—')}</dd>
   <dt>Pickup</dt><dd>${esc(fmt(b.start))}</dd><dt>Return</dt><dd>${esc(fmt(b.end))} (${plural(+b.days||0,'day')})</dd><dt>How they get it</dt><dd>${b.pickup==='delivery'?'Deliver to address':'At the office'}</dd><dt>Extras</dt><dd>${esc((b.extras||[]).join(', ')||'None')}</dd>${needsDriver(b)?`<dt>Driver</dt><dd>${b.driverName?`<b>${esc(b.driverName)}</b>, ${esc(b.driverPhone||'')}`:'<span class="err">Needs a driver. Assign one below.</span>'}</dd>`:''}
-  <dt>Total</dt><dd><b>${esc(peso(b.total))}</b> (${esc(peso(b.rate))} a day${b.extrasPerDay?` + ${esc(peso(b.extrasPerDay))} a day extras`:''}${b.delivery?` + ${esc(peso(b.delivery))} delivery`:''})</dd><dt>Deposit</dt><dd>${esc(peso(b.deposit))}</dd><dt>Customer notes</dt><dd>${esc(b.notes||'—')}</dd><dt>Requested</dt><dd>${esc(b.createdAt?new Date(b.createdAt).toLocaleString('en-PH'):'—')}</dd>${(b.changes||[]).length?`<dt>Changes</dt><dd>${b.changes.map(c=>`<div><b>${esc(tAt(c.at))}:</b> ${esc(c.what)}</div>`).join('')}</dd>`:''}</dl>
+  <dt>Total</dt><dd><b>${esc(peso(b.total))}</b> (${esc(peso(b.rate))} a day${b.extrasPerDay?` + ${esc(peso(b.extrasPerDay))} a day extras`:''}${b.delivery?` + ${esc(peso(b.delivery))} delivery`:''})</dd><dt>Deposit</dt><dd>${esc(peso(b.deposit))}</dd><dt>Customer notes</dt><dd>${esc(b.notes||'—')}</dd><dt>Requested</dt><dd>${esc(b.createdAt?new Date(b.createdAt).toLocaleString('en-PH'):'—')}</dd><dt>Terms</dt><dd>${b.termsAgreedAt?`Agreed on ${esc(tAt(b.termsAgreedAt))}`:'<span class="small">Not recorded</span>'}</dd>${(b.changes||[]).length?`<dt>Changes</dt><dd>${b.changes.map(c=>`<div><b>${esc(tAt(c.at))}:</b> ${esc(c.what)}</div>`).join('')}</dd>`:''}</dl>
   ${needsDriver(b)&&!['rejected','cancelled','completed'].includes(b.status)?`<div><label for="detDrv">Driver for this trip</label><div class="acts" style="justify-content:flex-start;flex-wrap:nowrap"><select id="detDrv" style="flex:1">${driverOpts(b.start,b.end,b.id,b.driverId)}</select><button class="btn" data-act="drv">${b.driverId?'Change driver':'Assign driver'}</button></div>${S.drivers.length?'':'<p class="hint">No drivers yet. Add them on the Drivers page.</p>'}</div>`:''}
+  ${['approved','active','completed'].includes(b.status)||hasHand(b,'pickup')||hasHand(b,'ret')?`<div class="hands">${['pickup','ret'].map(sd=>{const h=b.handover?.[sd]||{};return`<section class="hand" aria-labelledby="hh-${sd}"><h3 id="hh-${sd}">${HSIDE[sd][0]}</h3><p class="small" style="margin:0">${HSIDE[sd][1]} ${esc(b.name.split(' ')[0])} can see these on their booking.</p>
+    <div class="pfgrid" id="pfg-${sd}">${pfThumbs(owner,b,sd,true)||'<p class="small" style="margin:0">Nothing added yet.</p>'}</div>
+    <div class="acts" style="justify-content:flex-start"><label class="btn sm" for="pfP-${sd}">Add photos</label><input type="file" id="pfP-${sd}" class="vh" accept="image/*" multiple data-pfadd="${sd}|photo"><label class="btn sm" for="pfD-${sd}">Add signed document</label><input type="file" id="pfD-${sd}" class="vh" accept="image/*,application/pdf" multiple data-pfadd="${sd}|doc"><span class="small" id="pfMsg-${sd}" role="status"></span></div>
+    <div><label for="pfC-${sd}">Comments</label><textarea id="pfC-${sd}" placeholder="${sd==='pickup'?'e.g. Fuel full, 23,450 km. Small scratch on the rear bumper, shown in photo 3.':'e.g. Returned on time, fuel full, no new damage. Deposit returned.'}">${esc(h.comment||'')}</textarea></div>
+    <div class="acts" style="justify-content:flex-start"><button type="button" class="btn sm" data-pfsave="${sd}">Save comments</button>${h.updatedAt?`<span class="small">Last updated ${esc(tAt(h.updatedAt))}</span>`:''}</div></section>`}).join('')}</div>`:''}
   <div><label for="detNote">Comment or suggestion for the customer</label><textarea id="detNote" placeholder="Shown on their booking, e.g. where to pick up, or a suggestion for other dates">${esc(b.adminNote||'')}</textarea></div>
   <button class="btn" data-msg="${esc(owner)}|${esc(cidOf(b))}|${esc(b.name)}|${esc(b.phone)}" data-draft="About booking ${esc(b.ref)}: ">Send ${esc(b.name.split(' ')[0])} a message</button>`;
   const A={pending:[['edit','Change booking',''],['rejected','Reject','danger'],['approved','Approve','okb']],approved:[['edit','Change booking',''],['cancelled','Cancel booking','danger'],['active','Mark picked up','go']],active:[['edit','Change booking',''],['completed','Mark returned','go']],completed:[],rejected:[['pending','Reopen','']],cancelled:[['pending','Reopen','']]}[b.status]||[];
   $('#detActs').innerHTML=`<button class="btn ghost danger" data-act="delete">Delete</button><button class="btn ghost" data-act="copy">Copy details</button><span style="flex:1"></span><button class="btn" data-act="note">Save comment</button>${A.map(([s,l,k])=>`<button class="btn ${k}" data-act="${s}">${l}</button>`).join('')}`;
   licGet(owner,cidOf(b)).then(img=>{const el=$('#detLic');if(!el)return;el.innerHTML=img?`<button type="button" class="licthumb has sm" data-zoomsrc="1" aria-label="See the license photo larger"><img src="${esc(img)}" alt="Driver's license of ${esc(b.name)}"></button>`:`<span class="small">No photo uploaded${b.license?`. License no. ${esc(b.license)}`:''}</span>`}).catch(()=>{const el=$('#detLic');if(el)el.innerHTML='<span class="err">The photo could not be loaded.</span>'});
-  $('#detBody').onclick=e=>{if(e.target.closest('[data-act]'))$('#detActs').onclick(e)};
+  fillPfImgs($('#detBody'));
+  const saveHand=async(sd,fn)=>{let nb=null;const items=(S.bdocs.find(x=>x.id===owner)?.items||[]).map(x=>{if(x.id!==id)return x;const h=x.handover||{};nb={...x,handover:{...h,[sd]:{...fn(h[sd]||{}),updatedAt:Date.now()}}};return nb});
+    if(!nb)throw{message:'This booking was not found.'};await saveOwner(owner,items);const d=S.bdocs.find(x=>x.id===owner);if(d)d.items=items;return nb};
+  const redraw=(sd,nb)=>{const g=$('#pfg-'+sd);if(!g)return;g.innerHTML=pfThumbs(owner,nb,sd,true)||'<p class="small" style="margin:0">Nothing added yet.</p>';fillPfImgs(g)};
+  $('#detBody').onchange=async e=>{const inp=e.target.closest('[data-pfadd]');if(!inp)return;const[sd,kind]=inp.dataset.pfadd.split('|');const files=[...inp.files];inp.value='';if(!files.length)return;
+    const m=$('#pfMsg-'+sd);const added=[];
+    for(const [k,f] of files.entries()){m.textContent=`Uploading ${k+1} of ${files.length}…`;
+      try{const data=f.type==='application/pdf'?await pdfToDataUrl(f):await proofImg(f);const fid=await pfSave(owner,data);added.push({id:fid,kind,type:data.slice(5,data.indexOf(';')),name:String(f.name||'').slice(0,80),at:Date.now()})}
+      catch(x){toast((f.name?f.name+': ':'')+(x?.message||'Not uploaded. Try again.'))}}
+    if(added.length){try{redraw(sd,await saveHand(sd,h=>({...h,files:[...(h.files||[]),...added]})));m.textContent=`${added.length} added. ${b.name.split(' ')[0]} can see ${added.length>1?'them':'it'} now.`}catch(x){m.textContent='';toast('Not saved. Try again.')}}
+    else m.textContent=''};
+  $('#detBody').onclick=async e=>{const t=e.target;
+    const dl=t.closest('[data-pfdel]');if(dl){const[sd,fid]=dl.dataset.pfdel.split('|');if(!await ask('Remove this file from the booking? The customer will no longer see it.','Remove'))return;
+      try{redraw(sd,await saveHand(sd,h=>({...h,files:(h.files||[]).filter(f=>f.id!==fid)})));pfDel(owner,fid);toast('Removed')}catch(x){toast('Not removed. Try again.')}return}
+    const sv=t.closest('[data-pfsave]');if(sv){const sd=sv.dataset.pfsave;sv.disabled=true;try{await saveHand(sd,h=>({...h,comment:$('#pfC-'+sd).value.trim().slice(0,2000)}));toast('Comments saved. '+b.name.split(' ')[0]+' can see them now.')}catch(x){toast('Not saved. Try again.')}finally{sv.disabled=false}return}
+    if(t.closest('[data-act]'))$('#detActs').onclick(e)};
   if($('#detDrv'))$('#detDrv').value=b.driverId||'';
   $('#detActs').onclick=async e=>{
     const a=e.target.closest('[data-act]')?.dataset.act;if(!a)return;const note=$('#detNote').value.trim();
@@ -530,6 +613,7 @@ function openDetail(owner,id){
         await writeThread('replies',owner,cidOf(b),x=>({...x,name:b.name,phone:b.phone,msgs:[...(x.msgs||[]),{id:uid(),text:`Your driver for booking ${b.ref} is ${dr.name} (${dr.phone}).`,at:now}].slice(-300),seen:now})).catch(()=>{});
         toast(`${dr.name} assigned to ${b.ref}`);openDetail(owner,id);return}
       if(a==='approved'&&clash.length&&!await ask('This car already has an approved booking on overlapping dates. Approve anyway?','Approve'))return;
+      if(a==='cancelled'){if(!await ask(`Cancel booking ${b.ref} for ${b.name}? The ${b.carName} becomes free again for those dates, and ${b.name.split(' ')[0]} sees it as cancelled. You can reopen it later.`,'Cancel booking'))return;await setStatus(owner,id,a,note,{cancelledBy:'admin'});$('#dDet').close();toast('Booking cancelled');return}
       await setStatus(owner,id,a,note);$('#dDet').close();toast('Marked '+STS[a].toLowerCase());
     }catch(x){toast('Not saved. Try again.')}
   };
@@ -577,10 +661,22 @@ $('#dImgIn').addEventListener('change',async()=>{const f=$('#dImgIn').files[0];i
 $('#addDrv').addEventListener('click',()=>openDriver(null));
 
 /* ---------- settings (admin) ---------- */
+function termsHtml(t){const out=[];let list=null;
+  const flush=()=>{if(list){out.push('<ul>'+list.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>');list=null}};
+  for(const raw of String(t||'').split(/\r?\n/)){const l=raw.trim();
+    if(/^[-*•]\s+/.test(l)){(list=list||[]).push(l.replace(/^[-*•]\s+/,''));continue}
+    flush();if(!l)continue;
+    if(l.startsWith('#'))out.push(`<h2>${esc(l.replace(/^#+\s*/,''))}</h2>`);else out.push(`<p>${esc(l)}</p>`)}
+  flush();return out.join('')}
+function termsDate(){const t=SET().termsAt;return t?new Date(t).toLocaleDateString('en-PH',{year:'numeric',month:'long',day:'numeric'}):''}
+function renderTerms(){const st=SET();const d=termsDate();
+  $('#termsSub').textContent=(d?`Last updated ${d}. `:'')+'Please read these before you book. When you send a booking, you agree to them.';
+  $('#termsBody').innerHTML=st.terms.trim()?termsHtml(st.terms):'<p>There are no terms and conditions yet.</p>';
+  $('#termsEdit').classList.toggle('hide',!S.admin);$('#termsBook').classList.toggle('hide',!!S.admin)}
 function renderSettings(){
   if(S.setDirty)return;const st=SET();
   S.setEx=st.extras.map(x=>({...x}));drawExRows();
-  $('#setDel').value=st.delivery;$('#setCancel').value=st.cancelDays;$('#setMsg').textContent='';
+  $('#setDel').value=st.delivery;$('#setCancel').value=st.cancelDays;$('#setMsg').textContent='';$('#setTerms').value=st.terms;$('#setTermsSample').classList.toggle('hide',typeof S.settings?.terms==='string');
   $('#setName').value=st.siteName;{const c=st.contact||{};$('#setPhone').value=c.phone||'';$('#setEmail').value=c.email||'';$('#setAddr').value=c.addr||'';$('#setHours').value=c.hours||'';SOCIALS.forEach(([k,id])=>$('#'+id).value=c[k]||'');$('#setOtherL').value=c.otherLabel||''}S.setLogo=null;S.setLogoDrop=false;S.setLogoId=st.logoId;drawLogoPrev();
 }
 function drawLogoPrev(){const src=S.setLogo?S.setLogoUrl:(!S.setLogoDrop&&S.setLogoId?imgUrl(S.setLogoId):'');$('#setLogoPrev').innerHTML=src?`<img src="${esc(src)}" alt="Logo preview">`:'<svg width="48" height="31" viewBox="0 0 34 22" style="color:#fff"><use href="#i-car"/></svg>';$('#setLogoDel').classList.toggle('hide',!src)}
@@ -615,7 +711,8 @@ $('#setSave').addEventListener('click',async()=>{
   try{
     let logoId=S.setLogoDrop?'':oldLogo;
     if(S.setLogo){try{logoId=(await S.assets.upload(S.setLogo)).id}catch(x){msg.textContent='The logo was not uploaded: '+(x?.message||'try a smaller picture.');return}}
-    const data={...(S.settings||{}),extras:ex,delivery:del,cancelDays:cd,siteName,logoId,contact,updatedAt:Date.now()};
+    const terms=$('#setTerms').value.replace(/\s+$/,'');const termsAt=terms!==SET().terms||!(S.settings?.termsAt)?Date.now():S.settings.termsAt;
+    const data={...(S.settings||{}),extras:ex,delivery:del,cancelDays:cd,siteName,logoId,contact,terms,termsAt,updatedAt:Date.now()};
     await serial('set',()=>S.db.doc('settings/main').set(data));
     if(oldLogo&&oldLogo!==logoId&&S.assets)S.assets.delete(oldLogo).catch(()=>{});
     S.settings=data;S.setDirty=false;renderSettings();route();toast('Settings saved. Everyone sees the changes now.')}
@@ -624,9 +721,9 @@ $('#setSave').addEventListener('click',async()=>{
 
 /* ---------- pictures: license photos, logo, zoom ---------- */
 function setThumb(sel,img){const t=$(sel);if(!t)return;t.classList.toggle('has',!!img);t.innerHTML=img?`<img src="${esc(img)}" alt="Driver's license">`:'No photo yet';t.dataset.src=img||''}
-function openCarGallery(c,i){const ph=carPhotos(c);if(!ph.length)return;S.zg={ph,c,i};zgShow()}
-function zgShow(){const{ph,c,i}=S.zg;const p=ph[i];const L=p.kind&&!/^other/.test(p.kind)?SLOT_LABEL[p.kind]:'';
-  openZoom(imgUrl(p.id),carTitle(c));S.zg.on=true;$('#zLabel').textContent=`${L?L+' · ':''}${i+1} of ${ph.length}`;$('#zLabel').classList.remove('hide');
+function openCarGallery(c,i){const ph=carPhotos(c);if(!ph.length)return;S.zg={ph,c,i,title:'',desc:''};zgShow()}
+function zgShow(){const{ph,c,i}=S.zg;const p=ph[i];const L=p.label!==undefined?p.label:p.kind&&!/^other/.test(p.kind)?SLOT_LABEL[p.kind]:'';
+  openZoom(p.src||imgUrl(p.id),S.zg.title||carTitle(c),S.zg.desc||'');S.zg.on=true;$('#zLabel').textContent=`${L?L+' · ':''}${i+1} of ${ph.length}`;$('#zLabel').classList.remove('hide');
   $('#zHint').textContent=ph.length>1?'Swipe or use the arrows to see more. Tap to zoom.':'Tap the picture to zoom in or out.';
   $('#zPrev').classList.toggle('hide',ph.length<2);$('#zNext').classList.toggle('hide',ph.length<2);$('#zPrev').disabled=i<=0;$('#zNext').disabled=i>=ph.length-1}
 $('#zPrev').addEventListener('click',()=>{if(S.zg&&S.zg.i>0){S.zg.i--;zgShow()}});
@@ -679,8 +776,64 @@ async function licGet(owner,cid){
   else{const d=await S.db.doc(`licenses/${owner}/files/${cid}`).get();img=d.exists?(d.data().img||''):''}
   if(img)S.licCache[k]=img;return img;
 }
+/* pickup and return records: photos and signed documents, private like license photos */
+const HSIDE={pickup:['Car released / picked up','Photos of the car when it was handed over, and the signed rental agreement.','Pickup record'],ret:['Car returned','Photos of the car when it came back, and any signed return form.','Return record']};
+const hexId=()=>[...crypto.getRandomValues(new Uint8Array(8))].map(x=>x.toString(16).padStart(2,'0')).join('');
+async function proofImg(file){
+  if(!/^image\//.test(file?.type||''))throw{message:"That file isn't a picture or a PDF."};
+  if(file.size>25*1024*1024)throw{message:'That photo is too large. Choose one under 25 MB.'};
+  let bmp;try{bmp=await createImageBitmap(file)}catch(e){throw{message:"That picture can't be opened. Try a JPG or PNG."}}
+  for(const [mx,q] of [[1600,.8],[1400,.75],[1200,.7],[1000,.65],[800,.6]]){
+    const sc=Math.min(1,mx/Math.max(bmp.width,bmp.height));const cv=document.createElement('canvas');cv.width=Math.round(bmp.width*sc);cv.height=Math.round(bmp.height*sc);
+    const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,cv.width,cv.height);g.drawImage(bmp,0,0,cv.width,cv.height);
+    const url=cv.toDataURL('image/jpeg',q);if(url.length<450000)return url}
+  throw{message:'That photo is too detailed to save. Take it again a little further away.'}
+}
+function pdfToDataUrl(file){
+  if(file.size>650*1024)return Promise.reject({message:'That PDF is too large. Use one under 650 KB, or upload photos of the pages instead.'});
+  return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).replace(/^data:[^;]*;/,'data:application/pdf;'));r.onerror=()=>rej({message:"That PDF can't be read."});r.readAsDataURL(file)})
+}
+async function pfSave(owner,data){
+  let id;
+  if(S.server)id=(await S.db.api('api/file-set',{method:'POST',body:JSON.stringify({owner,data})})).id;
+  else{id='pf-'+hexId();
+    if(S.local){try{localStorage.setItem('cr-pf-'+id,data)}catch(e){throw{message:'Browser storage is full. Remove some photos.'}}}
+    else await S.db.doc(`licenses/${owner}/files/${id}`).set({img:data,updatedAt:Date.now()})}
+  S.pfCache[id]=data;return id
+}
+async function pfGet(owner,id){
+  if(S.pfCache[id])return S.pfCache[id];let d='';
+  if(S.server)d=(await S.db.api('api/file-get',{method:'POST',body:JSON.stringify({id})})).data||'';
+  else if(S.local){try{d=localStorage.getItem('cr-pf-'+id)||''}catch(e){}}
+  else{const x=await S.db.doc(`licenses/${owner}/files/${id}`).get();d=x.exists?(x.data().img||''):''}
+  if(d)S.pfCache[id]=d;return d
+}
+async function pfDel(owner,id){
+  delete S.pfCache[id];
+  if(S.server)await S.db.api('api/file-del',{method:'POST',body:JSON.stringify({id})}).catch(()=>{});
+  else if(S.local){try{localStorage.removeItem('cr-pf-'+id)}catch(e){}}
+  else await S.db.doc(`licenses/${owner}/files/${id}`).delete().catch(()=>{})
+}
+const hasHand=(b,sd)=>{const h=b.handover?.[sd];return!!(h&&((h.files||[]).length||h.comment))};
+function pfThumbs(owner,b,sd,admin){
+  return(b.handover?.[sd]?.files||[]).map((f,i)=>{const pdf=f.type==='application/pdf';const src=S.pfCache[f.id];const what=f.kind==='doc'?'Signed document':'Photo';
+    return`<figure class="pf"><button type="button" class="pfopen" data-pfview="${esc(owner)}|${esc(b.id)}|${sd}|${i}" aria-label="Open ${what.toLowerCase()} ${i+1}">${pdf?`<span class="pfpdf">${ic2('doc')}<span>PDF</span></span>`:`<img data-pfid="${esc(f.id)}" data-pfo="${esc(owner)}" ${src?`src="${esc(src)}"`:''} alt="${what}">`}</button><figcaption>${what}</figcaption>${admin?`<button type="button" class="pfx" data-pfdel="${sd}|${esc(f.id)}" aria-label="Remove this ${what.toLowerCase()}">×</button>`:''}</figure>`}).join('')
+}
+function fillPfImgs(root){root.querySelectorAll('img[data-pfid]:not([src])').forEach(im=>pfGet(im.dataset.pfo,im.dataset.pfid).then(d=>{if(d)im.src=d;else im.alt='Missing'}).catch(()=>{im.alt='Could not load'}))}
+async function openPf(owner,bid,sd,i){
+  const b=allBookings().find(x=>x.id===bid&&x.owner===owner)||allBookings().find(x=>x.id===bid);if(!b)return;
+  const files=b.handover?.[sd]?.files||[];const f=files[i];if(!f)return;
+  try{
+    if(f.type==='application/pdf'){const d=await pfGet(owner,f.id);if(!d){toast('The document could not be loaded.');return}
+      const blob=await (await fetch(d)).blob();const url=URL.createObjectURL(blob);
+      const w=window.open(url,'_blank');if(!w){const a=document.createElement('a');a.href=url;a.download=(f.name||'signed-document')+(/\.pdf$/i.test(f.name||'')?'':'.pdf');document.body.appendChild(a);a.click();a.remove()}
+      setTimeout(()=>URL.revokeObjectURL(url),60000);return}
+    const imgs=files.filter(x=>x.type!=='application/pdf');const srcs=await Promise.all(imgs.map(x=>pfGet(owner,x.id).catch(()=>'')));
+    S.zg={ph:imgs.map((x,k)=>({src:srcs[k],label:x.kind==='doc'?'Signed document':'Photo'})),title:`${HSIDE[sd][2]}, booking ${b.ref}`,desc:b.handover[sd].comment||'',i:imgs.indexOf(f)};zgShow()
+  }catch(x){toast('That file could not be opened. Try again.')}
+}
 const SOCIALS=[['fb','setFb','Facebook'],['ig','setIg','Instagram'],['tt','setTt','TikTok'],['yt','setYt','YouTube'],['x','setX','X (Twitter)'],['web','setWeb','Website'],['other','setOther','Other link']];
-const TRUST_IC={ig:'<rect x="3.5" y="3.5" width="17" height="17" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17" cy="7" r="1.2" fill="currentColor"/>',tt:'<path d="M14 4v10.5a3.5 3.5 0 1 1-3.5-3.5M14 4c.5 2.5 2.5 4.5 5 4.7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',yt:'<rect x="2.5" y="5.5" width="19" height="13" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor"/>',x:'<path d="M4 4l16 16M20 4L4 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',web:'<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" fill="none" stroke="currentColor" stroke-width="2"/>',other:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',chat:'<path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',car:'<path d="M3 15l2-5q1-2 3-2h8q2 0 3 2l2 5v3H3zM7 18v2M17 18v2M6.5 14h.01M17.5 14h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',x2:'<path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',cal:'<path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5M9 15l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',ok:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',truck:'<path d="M3 6h11v10H3zM14 10h4l3 3v3h-7M7 19a2 2 0 1 0 0-.1M17 19a2 2 0 1 0 0-.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',user:'<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1-4 4-6 8-6s7 2 8 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',mail:'<path d="M3 6h18v12H3zM3 7l9 6 9-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',pin:'<path d="M12 21s7-6 7-12a7 7 0 0 0-14 0c0 6 7 12 7 12zM12 11a2 2 0 1 0 0-.1" fill="none" stroke="currentColor" stroke-width="2"/>',clock:'<path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',fb:'<path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H7v4h3v7h4v-7h3l1-4h-4V8.5a.5.5 0 0 1 .5-.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>'};
+const TRUST_IC={ig:'<rect x="3.5" y="3.5" width="17" height="17" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17" cy="7" r="1.2" fill="currentColor"/>',tt:'<path d="M14 4v10.5a3.5 3.5 0 1 1-3.5-3.5M14 4c.5 2.5 2.5 4.5 5 4.7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',yt:'<rect x="2.5" y="5.5" width="19" height="13" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor"/>',x:'<path d="M4 4l16 16M20 4L4 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',web:'<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" fill="none" stroke="currentColor" stroke-width="2"/>',other:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',chat:'<path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',car:'<path d="M3 15l2-5q1-2 3-2h8q2 0 3 2l2 5v3H3zM7 18v2M17 18v2M6.5 14h.01M17.5 14h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',x2:'<path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',cal:'<path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5M9 15l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',ok:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',truck:'<path d="M3 6h11v10H3zM14 10h4l3 3v3h-7M7 19a2 2 0 1 0 0-.1M17 19a2 2 0 1 0 0-.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',user:'<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1-4 4-6 8-6s7 2 8 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',mail:'<path d="M3 6h18v12H3zM3 7l9 6 9-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',pin:'<path d="M12 21s7-6 7-12a7 7 0 0 0-14 0c0 6 7 12 7 12zM12 11a2 2 0 1 0 0-.1" fill="none" stroke="currentColor" stroke-width="2"/>',clock:'<path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',doc:'<path d="M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 16h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>',fb:'<path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H7v4h3v7h4v-7h3l1-4h-4V8.5a.5.5 0 0 1 .5-.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>'};
 const ic2=k=>`<svg viewBox="0 0 24 24" aria-hidden="true">${TRUST_IC[k]}</svg>`;
 function renderTrust(){const st=SET();const items=[['cal',st.cancelDays>0?`Cancel online up to ${cdTxt()} before pickup`:'Book online in a few minutes'],['ok','Every booking confirmed by our office'],['truck',`Delivery to your address`,` <span class="nw">(+${esc(peso(st.delivery))})</span>`]];
   if(st.extras.some(x=>x.driver))items.push(['user','Rent with a driver']);
@@ -701,6 +854,8 @@ function notifList(){const out=[];const cut=Date.now()-45*864e5;
       if(b.status!=='pending'&&!(b.status==='cancelled'&&b.cancelledBy==='customer'))out.push({id:`u:${b.id}:${b.status}`,ic:'car',t:ch&&ch.at>t-2000&&b.status==='approved'?t-1:t,html:`<b>Booking ${esc(b.ref)}</b> ${esc(W[b.status]||'was updated')}${b.status==='approved'&&b.driverName?` · Driver: ${esc(b.driverName)}`:''}`,go:()=>{location.hash='#my-bookings';route()}});
       if(ch&&ch.at>cut)out.push({id:`h:${b.id}:${(b.changes||[]).length}`,ic:'car',t:ch.at,html:`<b>Booking ${esc(b.ref)} was changed:</b> ${esc(ch.what.length>100?ch.what.slice(0,100)+'…':ch.what)}`,go:()=>{location.hash='#my-bookings';route()}})});
   }
+  if(S.session?.role==='customer')myItems().forEach(b=>['pickup','ret'].forEach(sd=>{const h=b.handover?.[sd];if(!hasHand(b,sd)||!(h.updatedAt>cut))return;
+    out.push({id:`p:${b.id}:${sd}:${(h.files||[]).length}:${(h.comment||'').length}`,ic:'doc',t:h.updatedAt,html:`<b>Booking ${esc(b.ref)}:</b> the office added ${sd==='pickup'?'pickup':'return'} photos and documents${h.comment?' with comments':''}`,go:()=>{location.hash='#my-bookings';route()}})}));
   const rm=readMap();out.forEach(n=>n.read=!!rm[n.id]||!!n.auto);return out.sort((a,b)=>b.t-a.t).slice(0,40)}
 async function markRead(ids){if(!ids.length)return;
   if(S.admin){const cur={...(S.notifRead||{})};ids.forEach(i=>cur[i]=Date.now());const keep=Object.entries(cur).sort((a,b)=>b[1]-a[1]).slice(0,400);S.notifRead=Object.fromEntries(keep);renderBell();
@@ -717,7 +872,7 @@ $('#nList').addEventListener('click',e=>{const b=e.target.closest('[data-ni]');i
 $('#nAll').addEventListener('click',e=>{e.stopPropagation();markRead((S.nList||[]).filter(n=>!n.read).map(n=>n.id))});
 document.addEventListener('click',e=>{if(!$('#nPanel').hidden&&!e.target.closest('#notifWrap')){$('#nPanel').hidden=true;$('#bellBtn').setAttribute('aria-expanded','false')}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#nPanel').hidden){$('#nPanel').hidden=true;$('#bellBtn').focus()}});
-function renderFooter(){const st=SET();const c=st.contact||{};
+function renderFooter(){const st=SET();const c=st.contact||{};$('#footTermsLi').classList.toggle('hide',!st.terms.trim());
   $('#footName').textContent=st.siteName;$('#footLogo').innerHTML=st.logoId?`<img src="${esc(imgUrl(st.logoId))}" alt="">`:'<svg width="34" height="22" style="color:#fff"><use href="#i-car"/></svg>';
   const li=[];if(c.phone)li.push(`<li>${ic2('phone')}<span>${esc(c.phone)}</span></li>`);if(c.email)li.push(`<li>${ic2('mail')}<span>${esc(c.email)}</span></li>`);if(c.addr)li.push(`<li>${ic2('pin')}<span>${esc(c.addr)}</span></li>`);if(c.hours)li.push(`<li>${ic2('clock')}<span>${esc(c.hours)}</span></li>`);li.push(`<li class="small" style="color:#c9d6ee">${ic2('chat')}<span>Message us after you book, under <a href="${S.session&&!S.admin?'#messages':'#login'}">Messages</a>.</span></li>`);
   const soc=SOCIALS.filter(([k])=>/^https:\/\//i.test(c[k]||'')).map(([k,,l])=>`<a class="soc" href="${esc(c[k])}" target="_blank" rel="noopener">${ic2(k==='fb'?'fb':k)}<span>${esc(k==='other'?(c.otherLabel||'Other link'):k==='fb'?'Facebook':l)}</span></a>`);
@@ -1051,6 +1206,8 @@ $('#setupForm').addEventListener('submit',async e=>{
 document.addEventListener('click',async e=>{
   const t=e.target;
   if(t.closest('[data-close]')){t.closest('dialog')?.close();return}
+  const pv=t.closest('[data-pfview]');if(pv){const[o,bid,sd,i]=pv.dataset.pfview.split('|');openPf(o,bid,sd,+i);return}
+  if(t.closest('[data-showterms]')){e.preventDefault();$('#tmBody').innerHTML=termsHtml(SET().terms)+(termsDate()?`<p class="small">Last updated ${esc(termsDate())}.</p>`:'');$('#dTerms').showModal();return}
   const th=t.closest('[data-th]');if(th){const[o,k]=th.dataset.th.split('|');const x=getThread(o,k);S.thread={owner:o,key:k,name:x.name,phone:x.phone};S.msgScrolled=false;renderMessages();markSeen();return}
   if(t.closest('#thBack')){S.thread=null;renderMessages();return}
   const mg=t.closest('[data-msg]');if(mg){const[o,k,n,p]=mg.dataset.msg.split('|');t.closest('dialog')?.close();S.msgScrolled=false;openThread(o,k,n,p,mg.dataset.draft||'');return}

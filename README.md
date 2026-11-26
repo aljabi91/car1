@@ -83,18 +83,24 @@ Customers can log in on any device and see their bookings, messages and details.
 ## What customers can do
 
 - See all cars and prices, and the **Recent activity** carousel posted by the admin.
+- Read the **Terms and conditions** page in the menu (also linked at the bottom of every page). Before sending a booking they must tick "I have read and agree to the Terms and conditions"; the link opens the terms without leaving the form.
 - Pick dates to see which cars are free and the total price.
 - Book in 3 steps: dates and extras → personal details and a **photo of their driver's license** → check and send. The photo shows in a small box; tapping it opens it larger, and tapping again zooms in.
-- Log in to see **My bookings** with each booking's progress and assigned driver, read the office's comments, and chat in **Messages**.
+- Log in to see **My bookings** with each booking's progress and assigned driver, read the office's comments, and chat in **Messages**. Under each message they sent there is **Edit** (fix a word or sentence; the message then shows "Edited") and **Delete** (asks first, then the office no longer sees it).
 - Edit their own details in **My details**, including uploading a new driver's license photo.
 - Cancel up to 2 days before pickup. The admin can change the number of days.
+- See the **Pickup record** and **Return record** on each booking under My bookings: the office's photos of the car, the signed documents (photos or PDF) and the office's comments. Tapping a photo opens it larger; tapping a PDF opens it.
 - The **bell** at the top shows new messages from the office, booking approvals or rejections, and booking changes. A number shows how many are new. Tapping one opens it and marks it **Read**; **Mark all as read** clears them all.
 
 ## What the admin can do
 
 - **Rentals**: approve or reject requests, mark pickup and return, comment, and change bookings (dates, car, extras, driver).
+  - **If a customer backs out after you approved:** open the booking and tap **Cancel booking**. It asks first, then the car is free again for those dates, the customer sees it as cancelled (and gets a notification), and it moves to the **Cancelled and rejected** report. There's no time limit for the admin. **Reopen** brings it back if they change their mind.
+  - **Delete** (bottom left of the booking) removes the booking completely, including from reports. Use it only for mistakes or test bookings; for a real customer who backs out, **Cancel booking** keeps the record.
+  - **Pickup and return records (proof):** once a booking is approved, its details window has two sections, **Car released / picked up** and **Car returned**. In each you can **Add photos** (any number, for example all sides of the car, the fuel gauge and odometer), **Add signed document** (the signed rental agreement with the terms, as a photo or a PDF under 650 KB), and write **Comments** (for example "Fuel full, 23,450 km, small scratch on the rear bumper"). The × on a file removes it. The customer sees all of it on their booking straight away and gets a notification. On a phone, **Add photos** can open the camera.
+  - Each booking also shows **Terms: Agreed on (date)** when the customer ticked the terms box.
 - **Customers**: everyone who has rented, with contact details and totals. **License** opens their driver's license photo. It also shows inside each booking.
-- **Messages**: chat with customers.
+- **Messages**: chat with customers. Under each message you sent there is **Edit** and **Delete**, so you can fix a typo or take a message back. Edited messages show "Edited". You can only change your own messages, not the customer's.
 - **Notifications (bell)**: new booking requests, new customer messages, and bookings a customer cancelled. The orange number is how many are new. Tapping one opens the booking or the chat and marks it **Read**; **Mark all as read** clears them. Read is saved on the server, so it stays read on your other phone or laptop. Replying to a chat also marks its message read.
 - **Fleet**: add, edit or delete cars and prices. Each car has **photo slots, all optional**: **Front view** (the main photo), **Back view**, **Interior** (dashboard and steering wheel), **Inside / seats**, and 2 **Other photo** slots (for example a side view or the trunk). Empty slots show an icon and an **Add** button; filled slots have **Change** and **Remove**. The quick **Add photo** button in the Fleet list fills the next empty slot.
 - **What customers see**: like Instagram, they swipe left and right through the car's photos on the card (or use the ‹ › arrows, or drag with a mouse), with dots, a 1/3 counter, and a label such as "Interior". Tapping a photo opens a larger viewer where they can keep swiping, use the arrows or the keyboard, and tap to zoom.
@@ -106,7 +112,7 @@ Customers can log in on any device and see their bookings, messages and details.
   2. **Pending**: requests waiting for an answer and what they'd earn if approved.
   3. **Cancelled and rejected**: with the office comment and the value lost.
   **Download Excel** saves exactly what you see, with sheets: Summary, Rentals and earnings, Earnings by car, Pending, Cancelled and rejected. Works without internet.
-- **Settings**: the **contact details** shown in the footer of every page (mobile, email, office address, office hours; empty boxes are hidden), **social media and other links** (Facebook, Instagram, TikTok, YouTube, X, your website, and one other link you name, such as Viber or Shopee). Links must start with https://. They show as clickable icons with names in the footer's **Contact us**, under the line "Message us after you book, under Messages", the **website name and logo** (shown at the top of every page and in the browser tab), extras and prices, delivery fee, cancellation rule, admin login. A PNG logo with a clear background looks neatest.
+- **Settings**: **Terms and conditions** (a large box at the bottom; start a line with # for a heading and - for a bullet; it starts with sample text that you should replace with your own and have checked by a lawyer; empty the box to hide the page and the tick box), the **contact details** shown in the footer of every page (mobile, email, office address, office hours; empty boxes are hidden), **social media and other links** (Facebook, Instagram, TikTok, YouTube, X, your website, and one other link you name, such as Viber or Shopee). Links must start with https://. They show as clickable icons with names in the footer's **Contact us**, under the line "Message us after you book, under Messages", the **website name and logo** (shown at the top of every page and in the browser tab), extras and prices, delivery fee, cancellation rule, admin login. A PNG logo with a clear background looks neatest.
 
 ## Design
 
@@ -137,3 +143,4 @@ car-rental-system/
 - Customer passwords are only 4 digits. The server allows 10 login tries per minute from one address to slow down guessing.
 - Car photos, renter photos and the logo are public: anyone with their link can open them.
 - **Driver's license photos are private.** They are stored apart from everything else (in Upstash Redis on Vercel, or `data/licenses/` on your computer), never in the public photo store. Only the admin and that customer can open them.
+- **Pickup and return photos and signed documents are private too**, kept in the same place as license photos. Only the admin and the customer of that booking can open them; other customers and visitors can't, even with the link. Only the admin can add or remove them.

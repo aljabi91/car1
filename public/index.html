@@ -260,7 +260,22 @@
           <div class="card" style="display:grid;gap:10px"><h2>Admin login</h2><p class="small">Change the admin username or password.</p><div><button type="button" class="btn" id="chgAdmin2">Change admin login</button></div></div>
         </div>
       </div>
+      <div class="card" style="display:grid;gap:10px;margin-top:16px">
+        <h2>Terms and conditions</h2>
+        <p class="small">Shown on the <a href="#terms">Terms and conditions</a> page in the menu, and customers must tick that they agree before they can send a booking. Start a line with <b>#</b> for a heading and <b>-</b> for a bullet point. Leave the box empty to hide the page.</p>
+        <p class="note" id="setTermsSample" style="margin:0">This is sample text to get you started. Replace it with your own terms, and have a lawyer check them.</p>
+        <label for="setTerms" class="hide">Terms and conditions text</label><textarea id="setTerms" maxlength="30000"></textarea>
+      </div>
       <div class="acts" style="justify-content:flex-start;margin-top:18px"><button class="btn go lg" id="setSave">Save settings</button><button type="button" class="btn" id="setUndo">Undo changes</button><span class="err" id="setMsg"></span></div>
+    </div>
+  </section>
+
+  <!-- TERMS -->
+  <section id="v-terms" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1>Terms and conditions</h1><p class="sub" id="termsSub"></p></div></div>
+      <div class="termsbar"><a class="btn" href="#settings" id="termsEdit">Edit in Settings</a><a class="btn go" href="#fleet" id="termsBook">Choose a car</a></div>
+      <article class="card terms" id="termsBody"></article>
     </div>
   </section>
 
@@ -305,7 +320,7 @@
   <div class="wrap foot-in">
     <div><a class="brand" href="#fleet"><span class="blogo" id="footLogo"></span><span id="footName">Car Rental</span></a><p class="small" id="footTag" style="margin-top:8px">Book online. Every request is confirmed by our office.</p></div>
     <div><h3>Contact us</h3><ul class="contact" id="footContact"></ul></div>
-    <div><h3>Pages</h3><ul class="contact"><li><a href="#fleet">Cars</a></li><li><a href="#login" id="footLogin">Log in</a></li><li><a href="#my-bookings">My bookings</a></li></ul></div>
+    <div><h3>Pages</h3><ul class="contact"><li><a href="#fleet">Cars</a></li><li><a href="#login" id="footLogin">Log in</a></li><li><a href="#my-bookings">My bookings</a></li><li id="footTermsLi"><a href="#terms">Terms and conditions</a></li></ul></div>
   </div>
   <div class="wrap foot-bottom small" id="footCopy"></div>
 </footer>
@@ -348,6 +363,7 @@
           <dl class="kv" id="bReview"></dl>
           <div class="summary" id="bSum3"></div>
           <p class="note" id="bPolicy"></p>
+          <label class="check" id="bTermsRow"><input type="checkbox" id="bTerms"><span>I have read and agree to the <a href="#terms" data-showterms>Terms and conditions</a>.</span></label>
           <label class="check"><input type="checkbox" id="bAgree"><span id="bAgreeT">My details are correct, I'll bring my driver's license and one government ID at pickup, and I understand that I can only cancel up to 2 days before pickup.</span></label>
         </div>
       </div>
@@ -404,6 +420,11 @@
 </dialog>
 
 <!-- Booking detail (admin) -->
+<dialog id="dTerms" aria-labelledby="tmT">
+  <div class="dh"><h2 id="tmT">Terms and conditions</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+  <div class="db terms" id="tmBody"></div>
+  <div class="df"><button type="button" class="btn go" data-close>Close</button></div>
+</dialog>
 <dialog id="dDet" aria-labelledby="detT">
   <div class="dh"><h2 id="detT">Booking</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
   <div class="db" id="detBody"></div>

@@ -37,6 +37,7 @@ const store = {
   version: async () => ver,
   getLicense: async id => { try { return fs.readFileSync(path.join(LICENSES, id + '.txt'), 'utf8'); } catch (e) { return ''; } },
   setLicense: async (id, img) => { fs.writeFileSync(path.join(LICENSES, id + '.txt'), img); },
+  delLicense: async id => { fs.rmSync(path.join(LICENSES, id + '.txt'), { force: true }); },
   tooMany: async ip => { const now = Date.now(); const t = (tries.get(ip) || []).filter(x => now - x < 60000); t.push(now); tries.set(ip, t); return t.length > 10; }
 };
 const EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif' };

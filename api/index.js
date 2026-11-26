@@ -51,6 +51,7 @@ const store = {
   async del(p) { await pipeline([['HDEL', HASH, p], ['INCR', 'cr:ver']]); },
   async getLicense(id) { return (await redis(['HGET', 'cr:lic', id])) || ''; },
   async setLicense(id, img) { await redis(['HSET', 'cr:lic', id, img]); },
+  async delLicense(id) { await redis(['HDEL', 'cr:lic', id]); },
   async version() { return +(await redis(['GET', 'cr:ver'])) || 0; },
   async secret() {
     if (secret) return secret;
