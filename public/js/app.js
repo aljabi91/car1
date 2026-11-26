@@ -29,7 +29,7 @@ const DEF_TERMS=`# Who can rent
 
 # Cancellation
 - You can cancel online up to the number of days before pickup shown on your booking. After that, message the office.`;
-const SET=()=>{const x=S.settings||{};return{contact:x.contact&&typeof x.contact==='object'?x.contact:{},siteName:String(x.siteName||'').trim()||'Car Rental',logoId:x.logoId||'',extras:Array.isArray(x.extras)?x.extras:DEF_SET.extras,delivery:Number.isFinite(+x.delivery)&&x.delivery!==undefined?+x.delivery:DEF_SET.delivery,cancelDays:Number.isFinite(+x.cancelDays)&&x.cancelDays!==undefined?+x.cancelDays:DEF_SET.cancelDays,terms:typeof x.terms==='string'?x.terms:DEF_TERMS,termsAt:+x.termsAt||0}};
+const SET=()=>{const x=S.settings||{};return{contact:x.contact&&typeof x.contact==='object'?x.contact:{},siteName:String(x.siteName||'').trim()||'Car Rental',logoId:x.logoId||'',extras:Array.isArray(x.extras)?x.extras:DEF_SET.extras,delivery:Number.isFinite(+x.delivery)&&x.delivery!==undefined?+x.delivery:DEF_SET.delivery,cancelDays:Number.isFinite(+x.cancelDays)&&x.cancelDays!==undefined?+x.cancelDays:DEF_SET.cancelDays,cancelText:typeof x.cancelText==='string'?x.cancelText.trim():'',terms:typeof x.terms==='string'?x.terms:DEF_TERMS,termsAt:+x.termsAt||0}};
 const hasTerms=()=>!!SET().terms.trim();
 const EX=()=>SET().extras;
 const cdTxt=()=>plural(SET().cancelDays,'day');
@@ -231,7 +231,7 @@ function renderStrip(){
 /* ---------- render: my bookings ---------- */
 const ORDER=['pending','approved','active','completed'];
 function renderMine(){
-  $('#cancelBanner').innerHTML=`<b>Cancellation policy:</b> you can cancel a booking up to ${esc(cdTxt())} before the pickup time. After that, message the office.`;
+  $('#cancelBanner').innerHTML=policyHtml();
   const el=$('#mineList');const list=[...myItems()].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   if(!list.length){el.innerHTML=`<div class="empty"><b>No bookings yet</b><a class="btn go" href="#fleet">Choose a car</a></div>`;return}
   el.innerHTML=list.map(b=>{const c=carById(b.carId);const canCancel=canCancelNow(b);const open=['pending','approved'].includes(b.status);const i=ORDER.indexOf(b.status);
@@ -509,7 +509,7 @@ function step(n){
   $('#wBack').classList.toggle('hide',n===1);
   $('#wNext').textContent=n===3?'Send booking request':'Next';
   $('#bErr').textContent='';
-  if(n===3){const v=id=>esc($(id).value.trim()||'—');const k=calc();const cb=cancelBy({start:k.s});$('#bAgreeT').textContent=`My details are correct, I'll bring my driver's license and one government ID at pickup, and I understand that I can only cancel up to ${cdTxt()} before pickup.`;$('#bPolicy').innerHTML=`<b>Cancellation policy:</b> you can cancel up to ${esc(cdTxt())} before pickup. For this booking, that's until <b>${esc(fmt(toLocal(cb)))}</b>.${+cb<=Date.now()?` Pickup is less than ${esc(cdTxt())} away, so this booking can't be cancelled online once sent.`:''}`;
+  if(n===3){const v=id=>esc($(id).value.trim()||'—');const k=calc();const cb=cancelBy({start:k.s});$('#bAgreeT').textContent=`My details are correct, I'll bring my driver's license and one government ID at pickup, and I ${SET().cancelText?'accept the cancellation policy above':`understand that I can only cancel up to ${cdTxt()} before pickup`}.`;$('#bPolicy').innerHTML=policyHtml(cb);
     $('#bReview').innerHTML=`<dt>Car</dt><dd>${esc(carTitle(k.c))}</dd><dt>Pickup</dt><dd>${esc(fmt(k.s))}</dd><dt>Return</dt><dd>${esc(fmt(k.e))}</dd><dt>How you get it</dt><dd>${k.del?'Delivered to your address':'Pick up at the office'}</dd><dt>Full name</dt><dd>${v('#bName')}</dd><dt>Mobile</dt><dd>${v('#bPhone')}</dd><dt>Email</dt><dd>${v('#bEmail')}</dd><dt>Address</dt><dd>${v('#bAddr')}</dd><dt>Driver's license</dt><dd>${S.licImg||S.licOnFile?`<button type="button" class="licthumb has sm" data-zoom="b" aria-label="See your license photo larger"><img src="${esc(S.licImg||S.licOnFile)}" alt="Driver's license"></button>`:'—'}</dd><dt>Emergency contact</dt><dd>${v('#bEmer')}</dd><dt>Notes</dt><dd>${v('#bNotes')}</dd>`}
   updSum();
   $('#dBook .db').scrollTop=0;$('#dBook').scrollTop=0;
@@ -661,6 +661,11 @@ $('#dImgIn').addEventListener('change',async()=>{const f=$('#dImgIn').files[0];i
 $('#addDrv').addEventListener('click',()=>openDriver(null));
 
 /* ---------- settings (admin) ---------- */
+function policyHtml(cb){const st=SET();const own=st.cancelText;
+  const head=own?`<b>Cancellation policy:</b> ${esc(own).replace(/\n/g,'<br>')}`:`<b>Cancellation policy:</b> you can cancel ${cb?'':'a booking '}up to ${esc(cdTxt())} before ${cb?'pickup':'the pickup time'}.${cb?'':' After that, message the office.'}`;
+  if(!cb)return head;
+  const late=+cb<=Date.now();
+  return head+(own?'<br>':' ')+(late?`Pickup is less than ${esc(cdTxt())} away, so this booking can't be cancelled online once sent. Message the office if your plans change.`:`${own?'You can cancel this booking online':'For this booking, that\'s'} until <b>${esc(fmt(toLocal(cb)))}</b>.`)}
 function termsHtml(t){const out=[];let list=null;
   const flush=()=>{if(list){out.push('<ul>'+list.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>');list=null}};
   for(const raw of String(t||'').split(/\r?\n/)){const l=raw.trim();
@@ -676,7 +681,7 @@ function renderTerms(){const st=SET();const d=termsDate();
 function renderSettings(){
   if(S.setDirty)return;const st=SET();
   S.setEx=st.extras.map(x=>({...x}));drawExRows();
-  $('#setDel').value=st.delivery;$('#setCancel').value=st.cancelDays;$('#setMsg').textContent='';$('#setTerms').value=st.terms;$('#setTermsSample').classList.toggle('hide',typeof S.settings?.terms==='string');
+  $('#setDel').value=st.delivery;$('#setCancel').value=st.cancelDays;$('#setCancelText').value=st.cancelText;$('#setMsg').textContent='';$('#setTerms').value=st.terms;$('#setTermsSample').classList.toggle('hide',typeof S.settings?.terms==='string');
   $('#setName').value=st.siteName;{const c=st.contact||{};$('#setPhone').value=c.phone||'';$('#setEmail').value=c.email||'';$('#setAddr').value=c.addr||'';$('#setHours').value=c.hours||'';SOCIALS.forEach(([k,id])=>$('#'+id).value=c[k]||'');$('#setOtherL').value=c.otherLabel||''}S.setLogo=null;S.setLogoDrop=false;S.setLogoId=st.logoId;drawLogoPrev();
 }
 function drawLogoPrev(){const src=S.setLogo?S.setLogoUrl:(!S.setLogoDrop&&S.setLogoId?imgUrl(S.setLogoId):'');$('#setLogoPrev').innerHTML=src?`<img src="${esc(src)}" alt="Logo preview">`:'<svg width="48" height="31" viewBox="0 0 34 22" style="color:#fff"><use href="#i-car"/></svg>';$('#setLogoDel').classList.toggle('hide',!src)}
@@ -712,7 +717,7 @@ $('#setSave').addEventListener('click',async()=>{
     let logoId=S.setLogoDrop?'':oldLogo;
     if(S.setLogo){try{logoId=(await S.assets.upload(S.setLogo)).id}catch(x){msg.textContent='The logo was not uploaded: '+(x?.message||'try a smaller picture.');return}}
     const terms=$('#setTerms').value.replace(/\s+$/,'');const termsAt=terms!==SET().terms||!(S.settings?.termsAt)?Date.now():S.settings.termsAt;
-    const data={...(S.settings||{}),extras:ex,delivery:del,cancelDays:cd,siteName,logoId,contact,terms,termsAt,updatedAt:Date.now()};
+    const data={...(S.settings||{}),extras:ex,delivery:del,cancelDays:cd,siteName,logoId,contact,terms,termsAt,cancelText:$('#setCancelText').value.trim().slice(0,1500),updatedAt:Date.now()};
     await serial('set',()=>S.db.doc('settings/main').set(data));
     if(oldLogo&&oldLogo!==logoId&&S.assets)S.assets.delete(oldLogo).catch(()=>{});
     S.settings=data;S.setDirty=false;renderSettings();route();toast('Settings saved. Everyone sees the changes now.')}
