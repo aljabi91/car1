@@ -67,7 +67,8 @@
   <!-- CUSTOMER: MY BOOKINGS -->
   <section id="v-my-bookings" class="view hide">
     <div class="wrap">
-      <div class="head"><div><h1>My bookings</h1><p class="sub">Each booking shows how far along it is. You can cancel any time before pickup.</p></div><a class="btn go" href="#fleet">Book another car</a></div>
+      <div class="head"><div><h1>My bookings</h1><p class="sub">Each booking shows how far along it is.</p></div><a class="btn go" href="#fleet">Book another car</a></div>
+      <p class="note" style="margin-bottom:16px" id="cancelBanner"></p>
       <div class="mine" id="mineList"></div>
     </div>
   </section>
@@ -127,6 +128,29 @@
     </div>
   </section>
 
+  <!-- CUSTOMER: MY DETAILS -->
+  <section id="v-my-details" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1>My details</h1><p class="sub">Keep your details up to date. They fill in your next booking form automatically and the office sees the new details on all your bookings.</p></div></div>
+      <form class="lcard" id="detForm" novalidate style="width:min(620px,100%)">
+        <p class="okmsg" id="pMsgOk"></p>
+        <div><label for="pName">Full name <span class="req">*</span></label><input id="pName" autocomplete="name"><p class="hint">This is also your login name.</p></div>
+        <div class="two">
+          <div><label for="pPhone">Mobile number <span class="req">*</span></label><input id="pPhone" type="tel" autocomplete="tel"><p class="hint">Its last 4 digits are your password.</p></div>
+          <div><label for="pEmail">Email</label><input id="pEmail" type="email" autocomplete="email"></div>
+        </div>
+        <div><label for="pAddr">Address <span class="req">*</span></label><textarea id="pAddr" autocomplete="street-address"></textarea></div>
+        <div class="two">
+          <div><label for="pLic">Driver's license no. <span class="req">*</span></label><input id="pLic"></div>
+          <div><label for="pEmer">Emergency contact</label><input id="pEmer" placeholder="Name and number"></div>
+        </div>
+        <p class="note" id="pWarn"></p>
+        <p class="err" id="pErr" role="alert"></p>
+        <div class="acts" style="justify-content:flex-start"><button class="btn go" id="pSave">Save changes</button><button type="button" class="btn" id="pReset">Undo changes</button></div>
+      </form>
+    </div>
+  </section>
+
   <!-- ADMIN: CUSTOMERS -->
   <section id="v-customers" class="view hide">
     <div class="wrap">
@@ -134,6 +158,39 @@
       <div class="tools"><input id="custQ" placeholder="Search name, mobile or email" aria-label="Search customers"></div>
       <div class="scroll"><table class="stack" id="custTable"><thead><tr><th>Customer</th><th>Mobile</th><th>Address</th><th class="num">Rentals</th><th class="num">Total spent</th><th>Last rental</th><th></th></tr></thead><tbody></tbody></table></div>
       <div class="empty hide" id="custEmpty"><b>No customers yet</b><span>People who book a car will show up here.</span></div>
+    </div>
+  </section>
+
+  <!-- ADMIN: DRIVERS -->
+  <section id="v-drivers" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1>Drivers</h1><p class="sub">Drivers you can send with customers who book "with a driver". Assign them from a booking.</p></div><button class="btn go" id="addDrv">Add a driver</button></div>
+      <p class="note" id="drvNeed" style="margin-bottom:16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"></p>
+      <div id="drvList"></div>
+    </div>
+  </section>
+
+  <!-- ADMIN: SETTINGS -->
+  <section id="v-settings" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1>Settings</h1><p class="sub">Prices and rules customers see when they book. Changes apply to new bookings; existing bookings keep their price.</p></div></div>
+      <div class="cols" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)">
+        <div class="card" style="display:grid;gap:12px">
+          <h2>Extras</h2>
+          <p class="small">Tick "Includes a driver" for extras where the office sends a driver. Those bookings ask you to assign one.</p>
+          <div id="exRows"></div>
+          <div><button type="button" class="btn" id="exAdd">Add an extra</button></div>
+        </div>
+        <div style="display:grid;gap:16px">
+          <div class="card" style="display:grid;gap:12px">
+            <h2>Fees and rules</h2>
+            <div><label for="setDel">Delivery fee (₱)</label><input id="setDel" type="number" min="0" step="50"></div>
+            <div><label for="setCancel">Customers can cancel up to this many days before pickup</label><input id="setCancel" type="number" min="0" max="60" step="1"></div>
+          </div>
+          <div class="card" style="display:grid;gap:10px"><h2>Admin login</h2><p class="small">Change the admin username or password.</p><div><button type="button" class="btn" id="chgAdmin2">Change admin login</button></div></div>
+        </div>
+      </div>
+      <div class="acts" style="justify-content:flex-start;margin-top:18px"><button class="btn go lg" id="setSave">Save settings</button><button type="button" class="btn" id="setUndo">Undo changes</button><span class="err" id="setMsg"></span></div>
     </div>
   </section>
 
@@ -198,7 +255,8 @@
         <div style="display:grid;gap:16px">
           <dl class="kv" id="bReview"></dl>
           <div class="summary" id="bSum3"></div>
-          <label class="check"><input type="checkbox" id="bAgree">My details are correct. I'll bring my driver's license and one government ID at pickup.</label>
+          <p class="note" id="bPolicy"></p>
+          <label class="check"><input type="checkbox" id="bAgree"><span id="bAgreeT">My details are correct, I'll bring my driver's license and one government ID at pickup, and I understand that I can only cancel up to 2 days before pickup.</span></label>
         </div>
       </div>
       <p class="err" id="bErr" role="alert"></p>
@@ -256,6 +314,50 @@
   <div class="dh"><h2 id="detT">Booking</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
   <div class="db" id="detBody"></div>
   <div class="df" id="detActs"></div>
+</dialog>
+
+<!-- Driver editor -->
+<dialog id="dDrv" aria-labelledby="drvT">
+  <form id="drvForm" novalidate>
+    <div class="dh"><h2 id="drvT">Add a driver</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+    <div class="db">
+      <div><label for="dName">Full name <span class="req">*</span></label><input id="dName"></div>
+      <div class="two">
+        <div><label for="dPhone">Mobile number <span class="req">*</span></label><input id="dPhone" type="tel" placeholder="0917 123 4567"></div>
+        <div><label for="dLic">Driver's license no. <span class="req">*</span></label><input id="dLic"></div>
+      </div>
+      <div class="two">
+        <div><label for="dStatus">Status</label><select id="dStatus"><option value="available">Available</option><option value="off">Off duty (can't be assigned)</option></select></div>
+        <div><label for="dImgIn">Photo</label><input type="file" id="dImgIn" accept="image/*"></div>
+      </div>
+      <div><label for="dNotes">Notes</label><input id="dNotes" placeholder="e.g. Knows Baguio and Tagaytay routes"></div>
+      <p class="err" id="dErr" role="alert"></p>
+    </div>
+    <div class="df"><button type="button" class="btn" data-close>Cancel</button><button class="btn go" id="dSave">Save driver</button></div>
+  </form>
+</dialog>
+
+<!-- Change booking (admin) -->
+<dialog id="dEdit" aria-labelledby="edT">
+  <form id="editForm" novalidate>
+    <div class="dh"><h2 id="edT">Change booking</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+    <div class="db">
+      <p class="small" id="eWho"></p>
+      <div><label for="eCar">Car</label><select id="eCar"></select></div>
+      <div class="two">
+        <div><label for="eStart">Pickup <span class="req">*</span></label><input type="datetime-local" id="eStart"></div>
+        <div><label for="eEnd">Return <span class="req">*</span></label><input type="datetime-local" id="eEnd"></div>
+      </div>
+      <div><label for="ePick">How they get the car</label><select id="ePick"><option value="office">Pick up at the office</option><option value="delivery">Deliver to their address (+₱500)</option></select></div>
+      <div><label>Extras</label><div class="extras" id="eExtras"></div></div>
+      <div id="eDrvBox"><label for="eDrv">Driver for this trip</label><select id="eDrv"></select></div>
+      <div class="summary" id="eSum"></div>
+      <p class="note" id="eClash"></p>
+      <label class="check"><input type="checkbox" id="eTell" checked>Tell the customer about the change in Messages</label>
+      <p class="err" id="eErr" role="alert"></p>
+    </div>
+    <div class="df"><button type="button" class="btn" data-close>Cancel</button><button class="btn go" id="eSave">Save changes</button></div>
+  </form>
 </dialog>
 
 <!-- Admin login setup -->
