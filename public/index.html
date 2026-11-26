@@ -29,19 +29,36 @@
   <!-- CUSTOMER DASHBOARD -->
   <section id="v-fleet" class="view">
     <div class="hero">
+      <svg class="scene" viewBox="0 0 1200 420" preserveAspectRatio="xMaxYMax slice" aria-hidden="true">
+        <defs>
+          <linearGradient id="skyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b2545"/><stop offset=".72" stop-color="#16396a"/><stop offset="1" stop-color="#1f4c86"/></linearGradient>
+          <radialGradient id="sunG" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffb066" stop-opacity=".9"/><stop offset=".35" stop-color="#ff7a1a" stop-opacity=".35"/><stop offset="1" stop-color="#ff7a1a" stop-opacity="0"/></radialGradient>
+          <linearGradient id="roadG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0e2240"/><stop offset="1" stop-color="#071629"/></linearGradient>
+        </defs>
+        <rect width="1200" height="420" fill="url(#skyG)"/>
+        <circle cx="900" cy="250" r="230" fill="url(#sunG)"/>
+        <path d="M0 262 C180 236 320 252 470 240 C620 228 760 246 900 236 C1030 228 1120 240 1200 234 V420 H0Z" fill="#12305a"/>
+        <path d="M0 290 C220 270 420 286 640 276 C860 266 1000 282 1200 272 V420 H0Z" fill="#0e2647"/>
+        <path d="M880 262 L940 262 L1200 420 L620 420Z" fill="url(#roadG)"/>
+        <path d="M909 268 L913 268 L938 300 L930 300Z M944 318 L954 318 L990 366 L974 366Z M1006 392 L1022 392 L1042 420 L1020 420Z" fill="#ff7a1a"/>
+        <path d="M880 262 L620 420 M940 262 L1200 420" stroke="#ffffff" stroke-opacity=".35" stroke-width="2"/>
+      </svg>
       <div class="wrap hero-in">
-        <div>
+        <div class="hero-copy">
+          <p class="kicker" id="heroKicker">Car rental</p>
           <h1>Rent a car for your next trip</h1>
-          <p class="sub">Set your pickup and return dates, choose a car that's free, and send your details. The rental office confirms every request.</p>
+          <p class="sub">Pick your dates, choose a car that's free, and send your details. The rental office confirms every request.</p>
         </div>
-        <form class="ticket" id="searchForm" onsubmit="return false" aria-label="Your rental dates">
+      </div>
+    </div>
+    <div class="wrap ticket-wrap">
+      <form class="ticket" id="searchForm" onsubmit="return false" aria-label="Your rental dates">
           <div class="stub"><label for="fStart">Pickup</label><input type="datetime-local" id="fStart"><span class="day" id="tStart">—</span><span class="time" id="tStartT"></span></div>
           <div class="perf" aria-live="polite"><b id="tDays">0</b><span id="tDaysL">days</span></div>
           <div class="stub"><label for="fEnd">Return</label><input type="datetime-local" id="fEnd"><span class="day" id="tEnd">—</span><span class="time" id="tEndT"></span></div>
           <div class="quick"><span class="small">Quick picks</span><button type="button" class="chip" data-q="1">Tomorrow, 1 day</button><button type="button" class="chip" data-q="wk">This weekend</button><button type="button" class="chip" data-q="3">3 days</button><button type="button" class="chip" data-q="7">1 week</button></div>
-        </form>
-      </div>
-      <div class="wrap"><ol class="steps" style="color:#fff"><li><b>1</b>Pick your dates</li><li><b>2</b>Choose a free car</li><li><b>3</b>Fill in your details</li><li><b>4</b>Log in to follow your booking</li></ol></div>
+      </form>
+      <ul class="trust" id="trust" aria-label="Why rent with us"></ul>
     </div>
     <div class="wrap">
       <p class="note" id="fleetNote" style="margin-top:18px"></p>
@@ -53,6 +70,15 @@
       </div>
       <p class="count-line" id="countLine"></p>
       <div class="grid" id="fleetGrid"></div>
+    </div>
+    <div class="wrap how">
+      <h2>How it works</h2>
+      <ol class="steps">
+        <li><b>1</b><div><h3>Pick your dates</h3><p>Choose pickup and return, or tap a quick pick like This weekend.</p></div></li>
+        <li><b>2</b><div><h3>Choose a free car</h3><p>Only cars free on your dates can be booked. The total is shown up front.</p></div></li>
+        <li><b>3</b><div><h3>Send your details</h3><p>Your name, mobile number, address and a photo of your driver's license.</p></div></li>
+        <li><b>4</b><div><h3>Follow your booking</h3><p>Log in with your name and the last 4 digits of your mobile to see its status and message the office.</p></div></li>
+      </ol>
     </div>
   </section>
 
@@ -207,6 +233,15 @@
             <div><label for="setDel">Delivery fee (₱)</label><input id="setDel" type="number" min="0" step="50"></div>
             <div><label for="setCancel">Customers can cancel up to this many days before pickup</label><input id="setCancel" type="number" min="0" max="60" step="1"></div>
           </div>
+          <div class="card" style="display:grid;gap:12px">
+            <h2>Contact details</h2>
+            <p class="small">Shown at the bottom of every page. Leave a box empty to hide it.</p>
+            <div><label for="setPhone">Mobile or phone</label><input id="setPhone" type="tel" placeholder="0917 123 4567"></div>
+            <div><label for="setEmail">Email</label><input id="setEmail" type="email" placeholder="hello@yourrental.com"></div>
+            <div><label for="setAddr">Office address</label><input id="setAddr" placeholder="Street, city"></div>
+            <div><label for="setHours">Office hours</label><input id="setHours" placeholder="Mon to Sat, 8 AM to 6 PM"></div>
+            <div><label for="setFb">Facebook page link</label><input id="setFb" type="url" placeholder="https://facebook.com/yourpage"></div>
+          </div>
           <div class="card" style="display:grid;gap:10px"><h2>Admin login</h2><p class="small">Change the admin username or password.</p><div><button type="button" class="btn" id="chgAdmin2">Change admin login</button></div></div>
         </div>
       </div>
@@ -251,6 +286,14 @@
       </div>
     </section>
 </main>
+<footer class="foot-site">
+  <div class="wrap foot-in">
+    <div><a class="brand" href="#fleet"><span class="blogo" id="footLogo"></span><span id="footName">Car Rental</span></a><p class="small" id="footTag" style="margin-top:8px">Book online. Every request is confirmed by our office.</p></div>
+    <div><h3>Contact us</h3><ul class="contact" id="footContact"></ul></div>
+    <div><h3>Pages</h3><ul class="contact"><li><a href="#fleet">Cars</a></li><li><a href="#login" id="footLogin">Log in</a></li><li><a href="#my-bookings">My bookings</a></li></ul></div>
+  </div>
+  <div class="wrap foot-bottom small" id="footCopy"></div>
+</footer>
 
 <!-- Booking wizard -->
 <dialog id="dBook" aria-labelledby="bkTitle">

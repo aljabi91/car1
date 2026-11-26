@@ -6,7 +6,7 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const peso=n=>'₱'+Math.round(Number(n)||0).toLocaleString('en-PH');
 const TYPES=['Sedan','Hatchback','SUV','MPV / Van','Pickup'];
 const DEF_SET={extras:[{id:'driver',label:'With a driver',perDay:1500,driver:true},{id:'seat',label:'Child car seat',perDay:200,driver:false},{id:'xdriver',label:'Additional driver on the contract',perDay:300,driver:false}],delivery:500,cancelDays:2};
-const SET=()=>{const x=S.settings||{};return{siteName:String(x.siteName||'').trim()||'Car Rental',logoId:x.logoId||'',extras:Array.isArray(x.extras)?x.extras:DEF_SET.extras,delivery:Number.isFinite(+x.delivery)&&x.delivery!==undefined?+x.delivery:DEF_SET.delivery,cancelDays:Number.isFinite(+x.cancelDays)&&x.cancelDays!==undefined?+x.cancelDays:DEF_SET.cancelDays}};
+const SET=()=>{const x=S.settings||{};return{contact:x.contact&&typeof x.contact==='object'?x.contact:{},siteName:String(x.siteName||'').trim()||'Car Rental',logoId:x.logoId||'',extras:Array.isArray(x.extras)?x.extras:DEF_SET.extras,delivery:Number.isFinite(+x.delivery)&&x.delivery!==undefined?+x.delivery:DEF_SET.delivery,cancelDays:Number.isFinite(+x.cancelDays)&&x.cancelDays!==undefined?+x.cancelDays:DEF_SET.cancelDays}};
 const EX=()=>SET().extras;
 const cdTxt=()=>plural(SET().cancelDays,'day');
 const needsDriver=b=>(b.extrasDetail||[]).some(x=>x.driver)||(b.extras||[]).includes('With a driver');
@@ -112,11 +112,17 @@ function route(){
   closeMenu();
   $('#activityBand').classList.toggle('hide',!ACT_VIEWS.includes(h));
   $('#nav').innerHTML=items.map(([k,l])=>{const n=k==='bookings'&&S.admin?pend:k==='messages'?unread:0;return `<a href="#${k}" ${k===h?'aria-current="page"':''}>${esc(l)}${n?`<span class="count" aria-label="${n} new">${n}</span>`:''}</a>`}).join('');
+  fitHeader();
   const tot=(S.admin?pend:0)+unread;$('#menuDot').textContent=tot;$('#menuDot').classList.toggle('hide',!tot);
   if(S.view!==h)scrollTo(0,0);
   S.view=h;render();
 }
 addEventListener('hashchange',route);
+function fitHeader(){const top=$('.top');top.classList.remove('compact');
+  const nav=$('#nav'),brand=$('.brand'),who=$('.top .who');
+  const wraps=innerWidth<=1000||nav.offsetTop>brand.offsetTop+8||who.offsetTop>brand.offsetTop+8;
+  top.classList.toggle('compact',wraps);if(!wraps)closeMenu()}
+addEventListener('resize',()=>{clearTimeout(S.fitT);S.fitT=setTimeout(fitHeader,60)});
 function closeMenu(){$('.top').classList.remove('open');$('#menuBtn').setAttribute('aria-expanded','false');$('#menuBtn').setAttribute('aria-label','Open menu')}
 $('#menuBtn').addEventListener('click',e=>{e.stopPropagation();const o=!$('.top').classList.contains('open');$('.top').classList.toggle('open',o);$('#menuBtn').setAttribute('aria-expanded',String(o));$('#menuBtn').setAttribute('aria-label',o?'Close menu':'Open menu');if(o)$('#nav a')?.focus()});
 document.addEventListener('click',e=>{if($('.top').classList.contains('open')&&!e.target.closest('#nav')&&!e.target.closest('#menuBtn'))closeMenu()});
@@ -561,7 +567,7 @@ function renderSettings(){
   if(S.setDirty)return;const st=SET();
   S.setEx=st.extras.map(x=>({...x}));drawExRows();
   $('#setDel').value=st.delivery;$('#setCancel').value=st.cancelDays;$('#setMsg').textContent='';
-  $('#setName').value=st.siteName;S.setLogo=null;S.setLogoDrop=false;S.setLogoId=st.logoId;drawLogoPrev();
+  $('#setName').value=st.siteName;{const c=st.contact||{};$('#setPhone').value=c.phone||'';$('#setEmail').value=c.email||'';$('#setAddr').value=c.addr||'';$('#setHours').value=c.hours||'';$('#setFb').value=c.fb||''}S.setLogo=null;S.setLogoDrop=false;S.setLogoId=st.logoId;drawLogoPrev();
 }
 function drawLogoPrev(){const src=S.setLogo?S.setLogoUrl:(!S.setLogoDrop&&S.setLogoId?imgUrl(S.setLogoId):'');$('#setLogoPrev').innerHTML=src?`<img src="${esc(src)}" alt="Logo preview">`:'<svg width="48" height="31" viewBox="0 0 34 22" style="color:#fff"><use href="#i-car"/></svg>';$('#setLogoDel').classList.toggle('hide',!src)}
 function drawExRows(){
@@ -587,11 +593,14 @@ $('#setSave').addEventListener('click',async()=>{
   const siteName=$('#setName').value.trim().replace(/\s+/g,' ');
   if(!siteName){msg.textContent='Enter a website name.';$('#setName').focus();return}
   if(S.setLogo&&!S.assets){msg.textContent='Only the admin can upload a logo.';return}
+  const contact={phone:$('#setPhone').value.trim(),email:$('#setEmail').value.trim(),addr:$('#setAddr').value.trim(),hours:$('#setHours').value.trim(),fb:$('#setFb').value.trim()};
+  if(contact.email&&!/^\S+@\S+\.\S+$/.test(contact.email)){msg.textContent='Check the email address in Contact details.';$('#setEmail').focus();return}
+  if(contact.fb&&!/^https:\/\/\S+\.\S+/i.test(contact.fb)){msg.textContent='The Facebook link must start with https://';$('#setFb').focus();return}
   const b=$('#setSave');b.disabled=true;const oldLogo=SET().logoId;
   try{
     let logoId=S.setLogoDrop?'':oldLogo;
     if(S.setLogo){try{logoId=(await S.assets.upload(S.setLogo)).id}catch(x){msg.textContent='The logo was not uploaded: '+(x?.message||'try a smaller picture.');return}}
-    const data={...(S.settings||{}),extras:ex,delivery:del,cancelDays:cd,siteName,logoId,updatedAt:Date.now()};
+    const data={...(S.settings||{}),extras:ex,delivery:del,cancelDays:cd,siteName,logoId,contact,updatedAt:Date.now()};
     await serial('set',()=>S.db.doc('settings/main').set(data));
     if(oldLogo&&oldLogo!==logoId&&S.assets)S.assets.delete(oldLogo).catch(()=>{});
     S.settings=data;S.setDirty=false;renderSettings();route();toast('Settings saved. Everyone sees the changes now.')}
@@ -635,8 +644,19 @@ async function licGet(owner,cid){
   else{const d=await S.db.doc(`licenses/${owner}/files/${cid}`).get();img=d.exists?(d.data().img||''):''}
   if(img)S.licCache[k]=img;return img;
 }
+const TRUST_IC={cal:'<path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5M9 15l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',ok:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',truck:'<path d="M3 6h11v10H3zM14 10h4l3 3v3h-7M7 19a2 2 0 1 0 0-.1M17 19a2 2 0 1 0 0-.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',user:'<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1-4 4-6 8-6s7 2 8 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',mail:'<path d="M3 6h18v12H3zM3 7l9 6 9-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',pin:'<path d="M12 21s7-6 7-12a7 7 0 0 0-14 0c0 6 7 12 7 12zM12 11a2 2 0 1 0 0-.1" fill="none" stroke="currentColor" stroke-width="2"/>',clock:'<path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',fb:'<path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H7v4h3v7h4v-7h3l1-4h-4V8.5a.5.5 0 0 1 .5-.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>'};
+const ic2=k=>`<svg viewBox="0 0 24 24" aria-hidden="true">${TRUST_IC[k]}</svg>`;
+function renderTrust(){const st=SET();const items=[['cal',st.cancelDays>0?`Cancel online up to ${cdTxt()} before pickup`:'Book online in a few minutes'],['ok','Every booking confirmed by our office'],['truck',`Delivery to your address`,` <span class="nw">(+${esc(peso(st.delivery))})</span>`]];
+  if(st.extras.some(x=>x.driver))items.push(['user','Rent with a driver']);
+  $('#trust').innerHTML=items.map(([k,t,h])=>`<li>${ic2(k)}<span>${esc(t)}${h||''}</span></li>`).join('')}
+function renderFooter(){const st=SET();const c=st.contact||{};
+  $('#footName').textContent=st.siteName;$('#footLogo').innerHTML=st.logoId?`<img src="${esc(imgUrl(st.logoId))}" alt="">`:'<svg width="34" height="22" style="color:#fff"><use href="#i-car"/></svg>';
+  const li=[];if(c.phone)li.push(`<li>${ic2('phone')}<span>${esc(c.phone)}</span></li>`);if(c.email)li.push(`<li>${ic2('mail')}<span>${esc(c.email)}</span></li>`);if(c.addr)li.push(`<li>${ic2('pin')}<span>${esc(c.addr)}</span></li>`);if(c.hours)li.push(`<li>${ic2('clock')}<span>${esc(c.hours)}</span></li>`);if(/^https:\/\//i.test(c.fb||''))li.push(`<li>${ic2('fb')}<a href="${esc(c.fb)}" target="_blank" rel="noopener">Facebook page</a></li>`);
+  $('#footContact').innerHTML=li.length?li.join(''):`<li class="small">${S.admin?'Add your contact details in Settings.':'Message us after you book, under Messages.'}</li>`;
+  $('#footCopy').textContent=`© ${new Date().getFullYear()} ${st.siteName}`;$('#heroKicker').textContent=st.siteName;
+  $('#footLogin').textContent=S.session?'My account':'Log in';$('#footLogin').href=S.session?(S.admin?'#bookings':'#my-bookings'):'#login'}
 function applyBrand(){
-  const st=SET();$('#brandName').textContent=st.siteName;
+  const st=SET();$('#brandName').textContent=st.siteName;renderFooter();renderTrust();
   const src=st.logoId?imgUrl(st.logoId):'';
   if(S.brandSrc!==src){S.brandSrc=src;$('#brandLogo').innerHTML=src?`<img src="${esc(src)}" alt="">`:'<svg width="34" height="22" style="color:#fff"><use href="#i-car"/></svg>';
     let ic=document.querySelector('link[rel=icon]');if(src){if(!ic){ic=document.createElement('link');ic.rel='icon';document.head.appendChild(ic)}ic.href=src}else if(ic)ic.remove()}
@@ -683,7 +703,7 @@ function renderReports(){
   document.querySelectorAll('#repQuick [data-rq]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.rq===S.repQuick)));
   const R=repSplit();const sumE=R.earned.reduce((a,b)=>a+(+b.total||0),0),sumP=R.pending.reduce((a,b)=>a+(+b.total||0),0),sumL=R.lost.reduce((a,b)=>a+(+b.total||0),0);
   const daysR=R.earned.reduce((a,b)=>a+(+b.days||0),0);
-  $('#repSum').innerHTML=[[peso(sumE),'total earned',1],[R.earned.length,'rentals'],[daysR,'days rented'],[R.earned.length?peso(sumE/R.earned.length):'₱0','average per rental'],[`${R.pending.length} · ${peso(sumP)}`,'pending requests'],[`${R.lost.length} · ${peso(sumL)}`,'cancelled or rejected']].map(([v,l,h])=>`<div class="stat${h?' hot':''}"><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join('');
+  $('#repSum').innerHTML=[[peso(sumE),'total earned',1],[R.earned.length,'rentals'],[daysR,'days rented'],[R.earned.length?peso(sumE/R.earned.length):'₱0','average per rental'],[peso(sumP),`${plural(R.pending.length,'pending request')}`],[peso(sumL),`${R.lost.length} cancelled or rejected`]].map(([v,l,h])=>`<div class="stat${h?' hot':''}"><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join('');
   const f=repFilters();const all=R.earned.length+R.pending.length+R.lost.length;
   $('#repLine').textContent=`${plural(all,'transaction')}${f.from||f.to?`, ${f.by==='created'?'booked':'picking up'} ${f.from?fmtLong(f.from):'any time'} to ${f.to?fmtLong(f.to):'now'}`:', all time'}${f.q?`, customer matching "${$('#repQ').value.trim()}"`:''}.`;
   $('#repJump').innerHTML=[['rs-earned','Rentals and earnings',R.earned.length],['rs-pending','Pending',R.pending.length],['rs-lost','Cancelled and rejected',R.lost.length]].map(([id,l,n])=>`<a class="chip" href="#${id}" data-jump="${id}" style="text-decoration:none">${l} ${n}</a>`).join('');

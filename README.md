@@ -97,11 +97,15 @@ Customers can log in on any device and see their bookings, messages and details.
   2. **Pending**: requests waiting for an answer and what they'd earn if approved.
   3. **Cancelled and rejected**: with the office comment and the value lost.
   **Download Excel** saves exactly what you see, with sheets: Summary, Rentals and earnings, Earnings by car, Pending, Cancelled and rejected. Works without internet.
-- **Settings**: the **website name and logo** (shown at the top of every page and in the browser tab), extras and prices, delivery fee, cancellation rule, admin login. A PNG logo with a clear background looks neatest.
+- **Settings**: the **contact details** shown in the footer of every page (mobile, email, office address, office hours, Facebook link; empty boxes are hidden), the **website name and logo** (shown at the top of every page and in the browser tab), extras and prices, delivery fee, cancellation rule, admin login. A PNG logo with a clear background looks neatest.
+
+## Design
+
+The colours follow the 60-30-10 rule: a calm off-white base (60%), deep navy for the header, hero and footer (30%), and orange only for the main buttons (10%), so the next step always stands out. The booking ticket sits large near the top, and a strip under it lists real reasons to book, built from your Settings (cancellation days, delivery fee, drivers).
 
 ## On phones and small screens
 
-When the screen is narrow, the menu folds into a ☰ button at the top right. Tap it to open the menu; tap a page or anywhere outside to close it. A small number on the button shows new requests or messages.
+Whenever the menu doesn't fit on one line (phones, small windows, and the longer admin menu on laptops), it folds into a ☰ button at the top right. Tap it to open the menu; tap a page or anywhere outside to close it. A small number on the button shows new requests or messages.
 
 ## Files
 
