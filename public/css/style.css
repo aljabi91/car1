@@ -469,6 +469,9 @@ nav a:hover{border-radius:10px}
 .revitem{border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:8px;background:var(--card)}
 .revitem.hid{opacity:.6;border-style:dashed}
 .cid{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;color:var(--mute);letter-spacing:.02em}
+.unitrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr) minmax(0,1.4fr) auto;gap:8px;align-items:center}
+.unitrow input,.unitrow select{min-width:0}
+@media(max-width:620px){.unitrow{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.unitrow .unote{grid-column:1/-1}}
 .psort{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;margin:22px 0 14px}
 .heroprev{position:relative;width:100%;max-width:360px;aspect-ratio:3/1;border-radius:12px;overflow:hidden;background:var(--band);border:1px solid var(--line)}
 .heroprev img,.heroprev svg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}

@@ -6,7 +6,7 @@
 <title>Car Rental System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=202611272303">
+<link rel="stylesheet" href="css/style.css?v=202611272316">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -124,7 +124,7 @@
         <div><h1 style="font-size:36px">Log in</h1><p class="sub" style="margin-top:6px">One login for customers and the rental office.</p></div>
         <p class="okmsg" id="lMsg"></p>
         <form id="loginForm" novalidate>
-          <div><label for="lName">Username</label><input id="lName" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="e.g. aljonabines0130"><p class="hint">Your first and last name plus your birth month and day, for example <b>aljonabines0130</b>. Customers from before can still use their full name until they add their birthday. Admin: use your admin username.</p></div>
+          <div><label for="lName">Username</label><input id="lName" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="e.g. juandelacruz0230"><p class="hint">Your first and last name plus your birth month and day, for example <b>juandelacruz0230</b>. Customers from before can still use their full name until they add their birthday. Admin: use your admin username.</p></div>
           <div><label for="lPass">Password</label><div class="pw"><input id="lPass" type="password" autocomplete="current-password" placeholder="Last 4 digits of your mobile"><button type="button" class="btn sm ghost" id="lShow">Show</button></div><p class="hint">Customers: for 0917 123 4567, the password is 4567.</p></div>
           <p class="err" id="lErr" role="alert"></p>
           <button class="btn go lg" id="lBtn" style="width:100%">Log in</button>
@@ -421,7 +421,7 @@
       <div class="wp hide" data-p="2">
         <div style="display:grid;gap:14px">
           <div><label for="bName">Full name <span class="req">*</span></label><input id="bName" autocomplete="name"><p class="hint">First and last name, as on your driver's license.</p></div>
-          <div id="bBdayRow"><label for="bBday">Birthday <span class="req">*</span></label><input id="bBday" type="date" autocomplete="bday"><p class="hint" id="bBdayHint">Your username is made from your first and last name and your birthday, for example aljonabines0130.</p></div>
+          <div id="bBdayRow"><label for="bBday">Birthday <span class="req">*</span></label><input id="bBday" type="date" autocomplete="bday"><p class="hint" id="bBdayHint">Your username is made from your first and last name and your birthday, for example juandelacruz0230.</p></div>
           <div class="two">
             <div><label for="bPhone">Mobile number <span class="req">*</span></label><input id="bPhone" type="tel" autocomplete="tel" placeholder="0917 123 4567"><p class="hint">Its last 4 digits are your password.</p></div>
             <div><label for="bEmail">Email</label><input id="bEmail" type="email" autocomplete="email"></div>
@@ -485,7 +485,13 @@
       <div class="three">
         <div><label for="cRate">Price per day (₱) <span class="req">*</span></label><input id="cRate" type="number" min="0" step="50"></div>
         <div><label for="cDep">Security deposit (₱)</label><input id="cDep" type="number" min="0" step="500"></div>
-        <div><label for="cPlate">Plate no.</label><input id="cPlate" placeholder="NAB 1234"></div>
+        <div><label>Units</label><div class="small" id="cUnitCount" style="padding-top:12px"></div></div>
+      </div>
+      <div class="locbox" style="gap:10px">
+        <div><b>Units of this car</b><p class="small" style="margin:2px 0 0">Every real car you can rent out under this listing: your own and partner owners' cars with the same model and color. Customers can book it as long as one unit is free for their dates. Add as many as you need.</p></div>
+        <div id="cUnits" style="display:grid;gap:8px"></div>
+        <div><button type="button" class="btn sm" id="cUnitAdd">Add a unit</button></div>
+        <input id="cPlate" type="hidden">
       </div>
       <div><label for="cDesc">Description</label><textarea id="cDesc"></textarea></div>
       <div><label for="cStatus">Listing status</label><select id="cStatus"><option value="available">Available to rent</option><option value="maintenance">Under maintenance (shown, can't be booked)</option><option value="hidden">Hidden from customers</option></select></div>
@@ -656,6 +662,6 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<script src="js/app.js?v=202611272303"></script>
+<script src="js/app.js?v=202611272316"></script>
 </body>
 </html>

@@ -94,10 +94,18 @@ async function shrink(file){
 /* ---------- availability ---------- */
 $('#searchForm').addEventListener('submit',e=>e.preventDefault());
 const allBlocks=()=>S.blocks.flatMap(d=>(d.items||[]).map(b=>({...b,owner:d.id})));
+/* a car listing can stand for several real cars (units), each with its own plate: own cars or partner owners' cars */
+function carUnits(c){const u=Array.isArray(c?.units)?c.units.filter(x=>x&&typeof x==='object'):[];return u.length?u:[{plate:c?.plate||'',from:'own',note:''}]}
+/* the most bookings running at the same moment between start and end */
+function maxAtOnce(list,start,end){const ev=[];list.forEach(b=>{ev.push([b.start<start?start:b.start,1]);ev.push([b.end>end?end:b.end,-1])});ev.sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:a[1]-b[1]);let n=0,m=0;ev.forEach(([,d])=>{n+=d;m=Math.max(m,n)});return m}
+/* bookings in the way: empty while at least one unit of this car is still free for the whole time */
 function clashes(carId,start,end,ignore){
   if(!start||!end)return[];
-  return allBlocks().filter(b=>b.carId===carId&&b.id!==ignore&&LIVE.includes(b.status)&&b.start<end&&start<b.end);
+  const over=allBlocks().filter(b=>b.carId===carId&&b.id!==ignore&&LIVE.includes(b.status)&&b.start<end&&start<b.end);
+  return maxAtOnce(over,start,end)>=carUnits(carById(carId)).length?over:[];
 }
+/* units free for a booking's dates (by plate), for the admin's plate choice */
+function freeUnits(carId,start,end,ignore){const used=new Set(allBookings().filter(b=>b.carId===carId&&b.id!==ignore&&LIVE.includes(b.status)&&b.start<end&&start<b.end).map(b=>String(b.plate||'').toUpperCase()));return carUnits(carById(carId)).filter(u=>!u.plate||!used.has(u.plate.toUpperCase()))}
 const allBookings=()=>S.bdocs.flatMap(d=>(d.items||[]).map(b=>({...b,owner:d.id})));
 
 /* ---------- sessions ---------- */
@@ -265,6 +273,7 @@ function mineCard(b){const c=carById(b.carId);const canCancel=canCancelNow(b);co
       <div>${esc(fmt(b.start))} to ${esc(fmt(b.end))}</div>
       <div class="small">${plural(+b.days||0,'day')} · <b style="color:var(--ink)">${esc(peso(b.total))}</b> · ${b.pickup==='delivery'?'Delivered to your address':'Pick up at the office'} · Ref <span class="plate">${esc(b.ref)}</span></div>
       ${i>=0?`<ol class="track" aria-label="Booking progress">${['Requested','Approved','Picked up','Returned'].map((l,k)=>`<li class="${k<=i?'done':''}">${l}</li>`).join('')}</ol>`:''}
+      ${['approved','active'].includes(b.status)&&b.plate?`<div><b>Car plate:</b> <span class="plate">${esc(b.plate)}</span></div>`:''}
       ${pickHtml(b)}
       ${needsDriver(b)&&!['rejected','cancelled'].includes(b.status)?`<div class="drvline">${drvPic(b)}<span><b>Your driver:</b> ${b.driverName?`${esc(b.driverName)}, ${esc(b.driverPhone||'')}`:'<span class="small">the office will assign a driver and tell you here.</span>'}</span></div>`:''}
       ${(b.changes||[]).length?`<p class="okmsg" style="margin-top:6px;font-weight:500"><b>Changed by the office on ${esc(tAt(b.changes.at(-1).at))}:</b> ${esc(b.changes.at(-1).what)}</p>`:''}
@@ -360,7 +369,7 @@ function renderAdmin(){
 }
 function renderCars(){
   const el=$('#carList');
-  el.innerHTML=S.cars.length?[...S.cars].sort((a,b)=>carTitle(a).localeCompare(carTitle(b))).map(c=>`<div class="fleetrow"><div class="ph">${carPic(c)}</div><div class="info"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><h3>${esc(carTitle(c))}</h3><span class="pill s-${esc(c.status)}">${c.status==='available'?'Available':c.status==='hidden'?'Hidden':'Maintenance'}</span></div><div class="small">${esc(c.year||'')} ${esc(c.type||'')} · ${esc(c.seats||'?')} seats · ${esc(c.trans||'')} · ${esc(c.fuel||'')}</div>${c.plate?`<div><span class="plate">${esc(c.plate)}</span> <span class="small">${plural(carImgs(c).length,'photo')}</span></div>`:`<div class="small">${plural(carImgs(c).length,'photo')}</div>`}</div><div class="acts"><span class="rateedit"><label for="r-${esc(c.id)}" class="small">₱ per day</label><input id="r-${esc(c.id)}" type="number" min="0" step="50" value="${esc(c.rate)}" data-rate="${esc(c.id)}"><button class="btn sm" data-saverate="${esc(c.id)}">Save price</button></span><label class="btn sm${S.assets?'':' hide'}" style="margin:0">Add photo<input type="file" accept="image/*" data-photo="${esc(c.id)}" hidden></label><button class="btn sm go" data-edit="${esc(c.id)}">Edit all details</button><button class="btn sm danger" data-cdel="${esc(c.id)}">Delete</button></div></div>`).join(''):'<div class="empty"><b>No cars yet</b><span>Add your first car to start taking bookings.</span></div>';
+  el.innerHTML=S.cars.length?[...S.cars].sort((a,b)=>carTitle(a).localeCompare(carTitle(b))).map(c=>`<div class="fleetrow"><div class="ph">${carPic(c)}</div><div class="info"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><h3>${esc(carTitle(c))}</h3><span class="pill s-${esc(c.status)}">${c.status==='available'?'Available':c.status==='hidden'?'Hidden':'Maintenance'}</span></div><div class="small">${esc(c.year||'')} ${esc(c.type||'')} · ${esc(c.seats||'?')} seats · ${esc(c.trans||'')} · ${esc(c.fuel||'')}</div>${(()=>{const u=carUnits(c);return u.length>1?`<div class="small" style="margin-top:4px"><b style="color:var(--ink)">${u.length} units:</b> ${u.map(x=>`<span class="plate" style="font-size:12px">${esc(x.plate||'no plate yet')}</span>${x.from==='partner'?' <span class="small">partner</span>':''}`).join(' ')}</div>`:''})()}${c.plate&&carUnits(c).length<2?`<div><span class="plate">${esc(c.plate)}</span> <span class="small">${plural(carImgs(c).length,'photo')}</span></div>`:`<div class="small">${plural(carImgs(c).length,'photo')}</div>`}</div><div class="acts"><span class="rateedit"><label for="r-${esc(c.id)}" class="small">₱ per day</label><input id="r-${esc(c.id)}" type="number" min="0" step="50" value="${esc(c.rate)}" data-rate="${esc(c.id)}"><button class="btn sm" data-saverate="${esc(c.id)}">Save price</button></span><label class="btn sm${S.assets?'':' hide'}" style="margin:0">Add photo<input type="file" accept="image/*" data-photo="${esc(c.id)}" hidden></label><button class="btn sm go" data-edit="${esc(c.id)}">Edit all details</button><button class="btn sm danger" data-cdel="${esc(c.id)}">Delete</button></div></div>`).join(''):'<div class="empty"><b>No cars yet</b><span>Add your first car to start taking bookings.</span></div>';
 }
 function renderPhotos(){
   const g=postsOrdered();const old=S.settings?.postSort==='oldest';
@@ -689,6 +698,8 @@ function openDetail(owner,id){
   <dl class="kv"><dt>Full name</dt><dd>${esc(b.name)}</dd><dt>Customer ID</dt><dd class="cid" style="font-size:14px">${esc(owner)}</dd><dt>Username</dt><dd>${(()=>{const ac=S.accounts.find(a=>a.id===owner);return ac?.user?`<b>${esc(ac.user)}</b>${ac.birthday?` <span class="small">· born ${esc(new Date(ac.birthday+'T12:00').toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'}))}</span>`:''}`:'<span class="small">Not set yet (no birthday on file)</span>'})()}</dd><dt>Mobile</dt><dd>${esc(b.phone)}</dd><dt>Email</dt><dd>${esc(b.email||'—')}</dd><dt>Address</dt><dd>${esc(b.address)}</dd><dt>Driver's license</dt><dd id="detLic"><span class="small">Loading photo…</span></dd><dt>Emergency contact</dt><dd>${esc(b.emergency||'—')}</dd>
   <dt>Pickup</dt><dd>${esc(fmt(b.start))}</dd><dt>Return</dt><dd>${esc(fmt(b.end))} (${plural(+b.days||0,'day')})</dd><dt>How they get it</dt><dd>${b.meetAt?.text?`<b>Customer's chosen place:</b> ${esc(b.meetAt.text)} <a href="${esc(placeDir(b.meetAt))}" target="_blank" rel="noopener">Open map</a><div class="small">Chosen ${esc(tAt(b.meetAt.at||0))}. Booked as ${b.pickup==='delivery'?'delivery':'office pickup'}; use Change booking to add the delivery fee if needed.</div>`:b.pickup==='delivery'?'Deliver to address':'At the office'}${(()=>{const r=routeInfo(b);return r?`<div class="routewrap" style="margin-top:8px">${routeFrame(r,'Route from the office to '+r.to)}<a class="small" href="${esc(r.open)}" target="_blank" rel="noopener">Open route in Google Maps</a></div>`:''})()}</dd><dt>Extras</dt><dd>${esc((b.extras||[]).join(', ')||'None')}</dd>${needsDriver(b)?`<dt>Driver</dt><dd>${b.driverName?`<span class="drvline">${drvPic(b)}<span><b>${esc(b.driverName)}</b>, ${esc(b.driverPhone||'')}</span></span>`:'<span class="err">Needs a driver. Assign one below.</span>'}</dd>`:''}
   <dt>Total</dt><dd><b>${esc(peso(b.total))}</b> (${esc(peso(b.rate))} a day${b.extrasPerDay?` + ${esc(peso(b.extrasPerDay))} a day extras`:''}${b.delivery?` + ${esc(peso(b.delivery))} delivery`:''})</dd><dt>Deposit</dt><dd>${esc(peso(b.deposit))}</dd><dt>Customer notes</dt><dd>${esc(b.notes||'—')}</dd><dt>Requested</dt><dd>${esc(b.createdAt?new Date(b.createdAt).toLocaleString('en-PH'):'—')}</dd><dt>Terms</dt><dd>${b.termsAgreedAt?`Agreed on ${esc(tAt(b.termsAgreedAt))}`:'<span class="small">Not recorded</span>'}</dd>${(b.changes||[]).length?`<dt>Changes</dt><dd>${b.changes.map(c=>`<div><b>${esc(tAt(c.at))}:</b> ${esc(c.what)}</div>`).join('')}</dd>`:''}</dl>
+  ${!['rejected','cancelled','completed'].includes(b.status)?(()=>{const units=carUnits(c||{plate:b.plate}),free=new Set(freeUnits(b.carId,b.start,b.end,b.id).map(u=>u.plate.toUpperCase())),cur=String(b.plate||'').toUpperCase(),known=units.some(u=>u.plate&&u.plate.toUpperCase()===cur);
+    return`<div><label for="detPlate">Plate for this trip</label><div class="acts" style="justify-content:flex-start;flex-wrap:wrap"><select id="detPlate" style="flex:1;min-width:220px">${units.filter(u=>u.plate).map(u=>{const P=u.plate.toUpperCase();return`<option value="${esc(P)}"${P===cur?' selected':''}>${esc(P)} · ${u.from==='partner'?'partner':'own'}${u.note?' · '+esc(u.note):''}${P!==cur&&!free.has(P)?' (busy then)':''}</option>`}).join('')}${cur&&!known?`<option value="${esc(cur)}" selected>${esc(cur)} (not in the unit list)</option>`:''}<option value="__other">Another plate…</option></select><input id="detPlateOther" class="hide" placeholder="Type the plate" style="flex:1;min-width:160px"><button class="btn" data-act="plate">Set plate</button></div><p class="hint">Which actual car goes out. The customer sees this plate on their booking.</p></div>`})():''}
   ${needsDriver(b)&&!['rejected','cancelled','completed'].includes(b.status)?`<div><label for="detDrv">Driver for this trip</label><div class="acts" style="justify-content:flex-start;flex-wrap:nowrap"><select id="detDrv" style="flex:1">${driverOpts(b.start,b.end,b.id,b.driverId)}</select><button class="btn" data-act="drv">${b.driverId?'Change driver':'Assign driver'}</button></div>${S.drivers.length?'':'<p class="hint">No drivers yet. Add them on the Drivers page.</p>'}</div>`:''}
   ${['approved','active','completed'].includes(b.status)||hasHand(b,'pickup')||hasHand(b,'ret')?`<div class="hands">${['pickup','ret'].map(sd=>{const h=b.handover?.[sd]||{};return`<section class="hand" aria-labelledby="hh-${sd}"><h3 id="hh-${sd}">${HSIDE[sd][0]}</h3><p class="small" style="margin:0">${HSIDE[sd][1]} ${esc(b.name.split(' ')[0])} can see these on their booking.</p>
     <div class="pfgrid" id="pfg-${sd}">${pfThumbs(owner,b,sd,true)||'<p class="small" style="margin:0">Nothing added yet.</p>'}</div>
@@ -717,6 +728,7 @@ function openDetail(owner,id){
     const sv=t.closest('[data-pfsave]');if(sv){const sd=sv.dataset.pfsave;sv.disabled=true;try{await saveHand(sd,h=>({...h,comment:$('#pfC-'+sd).value.trim().slice(0,2000)}));toast('Comments saved. '+b.name.split(' ')[0]+' can see them now.')}catch(x){toast('Not saved. Try again.')}finally{sv.disabled=false}return}
     if(t.closest('[data-act]'))$('#detActs').onclick(e)};
   if($('#detDrv'))$('#detDrv').value=b.driverId||'';
+  if($('#detPlate'))$('#detPlate').onchange=()=>{$('#detPlateOther').classList.toggle('hide',$('#detPlate').value!=='__other');if($('#detPlate').value==='__other')$('#detPlateOther').focus()};
   $('#detActs').onclick=async e=>{
     const a=e.target.closest('[data-act]')?.dataset.act;if(!a)return;const note=$('#detNote').value.trim();
     try{
@@ -727,6 +739,12 @@ function openDetail(owner,id){
         if(!await ask(`Delete booking ${b.ref} for ${b.name}? This can't be undone.`,'Delete'))return;await saveOwner(owner,rest);$('#dDet').close();toast('Booking deleted');return}
       if(a==='note'){await setStatus(owner,id,b.status,note);toast('Comment saved');return}
       if(a==='edit'){$('#dDet').close();openEdit(owner,id);return}
+      if(a==='plate'){let P=$('#detPlate').value;if(P==='__other')P=$('#detPlateOther').value.trim().toUpperCase();if(!P){toast('Enter the plate first');return}
+        if(P===String(b.plate||'').toUpperCase()){toast('That plate is already set');return}
+        const other=allBookings().find(x=>x.id!==id&&x.carId===b.carId&&LIVE.includes(x.status)&&String(x.plate||'').toUpperCase()===P&&x.start<b.end&&b.start<x.end);
+        if(other&&!await ask(`${P} is already going out for booking ${other.ref} (${fmt(other.start)} to ${fmt(other.end)}). Use it anyway?`,'Use it anyway'))return;
+        const items=(S.bdocs.find(x=>x.id===owner)?.items||[]).map(x=>x.id===id?{...x,plate:P,changes:[...(x.changes||[]),{at:Date.now(),what:`car plate: ${P}`}],updatedAt:Date.now()}:x);
+        await saveOwner(owner,items);toast(`Plate ${P} set for ${b.ref}`);openDetail(owner,id);return}
       if(a==='drv'){const dr=S.drivers.find(x=>x.id===$('#detDrv').value);if(!dr){toast('Choose a driver first');return}
         if(driverBusy(dr.id,b.start,b.end,b.id).length&&!await ask(`${dr.name} already drives another booking at that time. Assign anyway?`,'Assign anyway'))return;
         const items=(S.bdocs.find(x=>x.id===owner)?.items||[]).map(x=>x.id===id?{...x,driverId:dr.id,driverName:dr.name,driverPhone:dr.phone,changes:[...(x.changes||[]),{at:Date.now(),what:`driver: ${dr.name}, ${dr.phone}`}],updatedAt:Date.now()}:x);
@@ -1355,12 +1373,18 @@ $('#editForm').addEventListener('submit',async e=>{
 
 /* ---------- car editor ---------- */
 $('#cType').innerHTML=TYPES.map(t=>`<option>${t}</option>`).join('');
-function carFromForm(){const v=id=>$(id).value.trim();return{brand:v('#cBrand'),name:v('#cName'),year:+v('#cYear')||'',type:$('#cType').value,seats:+v('#cSeats')||'',trans:$('#cTrans').value,fuel:$('#cFuel').value,color:$('#cColor').value,rate:+v('#cRate')||0,deposit:+v('#cDep')||0,plate:v('#cPlate').toUpperCase(),desc:v('#cDesc'),status:$('#cStatus').value}}
+function carFromForm(){const v=id=>$(id).value.trim();return{brand:v('#cBrand'),name:v('#cName'),year:+v('#cYear')||'',type:$('#cType').value,seats:+v('#cSeats')||'',trans:$('#cTrans').value,fuel:$('#cFuel').value,color:$('#cColor').value,rate:+v('#cRate')||0,deposit:+v('#cDep')||0,plate:(S.cUnits?.[0]?.plate||'').trim().toUpperCase(),units:(S.cUnits||[]).map(u=>({plate:String(u.plate||'').trim().toUpperCase(),from:u.from==='partner'?'partner':'own',note:String(u.note||'').trim().slice(0,120)})),desc:v('#cDesc'),status:$('#cStatus').value}}
 function carPrev(){const c=carFromForm();const first=SLOTS.map(([k])=>S.carSlots?.[k]).find(Boolean);$('#cPrev').innerHTML=first?`<img src="${esc(first.url)}" alt="Main photo">`:carSvg(c);drawSlots()}
 function drawSlots(){const sl=S.carSlots||{};const n=SLOTS.filter(([k])=>sl[k]).length;$('#cPhotoCount').textContent=n?`(${n} of 6)`:'';
   const mainK=SLOTS.map(([k])=>k).find(k=>sl[k]);
   $('#cSlots').innerHTML=SLOTS.map(([k,l,h,ic])=>{const x=sl[k];return x?`<div class="slot has"><div class="pic"><img src="${esc(x.url)}" alt="${esc(l)}">${k===mainK?'<span class="mainb">Main</span>':''}</div><div class="meta"><b>${esc(l)}</b></div><div class="acts2"><button type="button" class="btn" data-slot="${k}" data-sa="add">Change</button><button type="button" class="btn danger" data-slot="${k}" data-sa="rm">Remove</button></div></div>`
     :`<div class="slot"><div class="pic"><svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg></div><div class="meta"><span><b>${esc(l)}</b>${h?`<br><span class="small">${esc(h)}</span>`:''}</span></div><div class="acts2"><button type="button" class="btn sm go" data-slot="${k}" data-sa="add" ${S.assets?'':'disabled'}>Add</button></div></div>`}).join('')}
+function drawUnits(){const u=S.cUnits||[];$('#cUnitCount').textContent=`${u.length} ${u.length===1?'unit':'units'}`;
+  $('#cUnits').innerHTML=u.map((x,i)=>`<div class="unitrow"><input aria-label="Plate of unit ${i+1}" data-up="${i}" value="${esc(x.plate||'')}" placeholder="Plate, e.g. NAB 1234"><select aria-label="Whose car is unit ${i+1}" data-uf="${i}"><option value="own"${x.from!=='partner'?' selected':''}>Own car</option><option value="partner"${x.from==='partner'?' selected':''}>Partner's car</option></select><input class="unote" aria-label="Note for unit ${i+1}" data-un="${i}" value="${esc(x.note||'')}" placeholder="${x.from==='partner'?'Owner name and mobile':'Note (optional)'}"><button type="button" class="btn sm danger" data-ux="${i}" ${u.length<2?'disabled title="A car needs at least one unit"':''}>Remove</button></div>`).join('')}
+$('#cUnits').addEventListener('input',e=>{const t=e.target,u=S.cUnits;if(t.dataset.up!==undefined)u[+t.dataset.up].plate=t.value.toUpperCase();if(t.dataset.un!==undefined)u[+t.dataset.un].note=t.value});
+$('#cUnits').addEventListener('change',e=>{const t=e.target;if(t.dataset.uf!==undefined){S.cUnits[+t.dataset.uf].from=t.value;drawUnits()}});
+$('#cUnits').addEventListener('click',e=>{const x=e.target.closest('[data-ux]');if(x&&S.cUnits.length>1){S.cUnits.splice(+x.dataset.ux,1);drawUnits()}});
+$('#cUnitAdd').addEventListener('click',()=>{S.cUnits.push({plate:'',from:'partner',note:''});drawUnits();$(`[data-up="${S.cUnits.length-1}"]`).focus()});
 function openCar(id){
   const c=id?carById(id):null;S.editing=c;$('#cImg').value='';$('#cErr').textContent='';
   S.carSlots={};carPhotos(c).forEach(p=>{let k=p.kind&&SLOT_LABEL[p.kind]&&!S.carSlots[p.kind]?p.kind:SLOTS.map(([x])=>x).find(x=>!S.carSlots[x]);if(k)S.carSlots[k]={id:p.id,url:imgUrl(p.id)}});
@@ -1368,6 +1392,7 @@ function openCar(id){
   [['#cBrand','brand'],['#cName','name'],['#cYear','year'],['#cSeats','seats'],['#cRate','rate'],['#cDep','deposit'],['#cPlate','plate'],['#cDesc','desc']].forEach(([s,k])=>$(s).value=d[k]??'');
   $('#cType').value=d.type;$('#cTrans').value=d.trans;$('#cFuel').value=d.fuel;$('#cColor').value=/^#[0-9a-f]{6}$/i.test(d.color||'')?d.color:'#8a8f99';$('#cStatus').value=d.status||'available';
   $('#carT').textContent=c?'Edit '+carTitle(c):'Add a car';$('#cDel').classList.toggle('hide',!c);
+  S.cUnits=carUnits(c||{plate:''}).map(x=>({plate:x.plate||'',from:x.from||'own',note:x.note||''}));drawUnits();
   carPrev();$('#dCar').showModal();
 }
 $('#carForm').addEventListener('input',e=>{if(e.target.id!=='cImg')carPrev()});
@@ -1381,6 +1406,7 @@ $('#carForm').addEventListener('submit',async e=>{
   e.preventDefault();const c=carFromForm();
   if(!c.brand||!c.name){$('#cErr').textContent='Enter the brand and model.';return}
   if(!(c.rate>0)){$('#cErr').textContent='Enter a price per day above zero.';return}
+  {const pl=c.units.map(u=>u.plate).filter(Boolean);if(new Set(pl).size!==pl.length){$('#cErr').textContent='Two units have the same plate. Each unit needs its own plate.';return}}
   const btn=$('#cSave');btn.disabled=true;btn.textContent='Saving…';
   try{
     const old=S.editing;const photos=[];const todo=SLOTS.filter(([k])=>S.carSlots[k]&&!S.carSlots[k].id).length;let up=0;
