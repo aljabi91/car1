@@ -448,6 +448,26 @@ nav a:hover{border-radius:10px}
 .foot-site .dir{color:#ffb067;font-weight:700;white-space:nowrap}
 .hifil{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
 .hifil select{min-width:220px}
+.stars{color:#f59e0b;letter-spacing:1px;white-space:nowrap}
+.stars .off{color:var(--line)}
+.revband{background:var(--card);padding:40px 0 48px;border-top:1px solid var(--line)}
+.revavg{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:6px}
+.revavg b{font-size:34px;font-weight:800;line-height:1}
+.revcard{padding:18px;gap:10px;justify-content:flex-start}
+.revcard p{margin:0;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
+.revwho{font-weight:700}
+.revmeta{font-size:13px;color:var(--mute)}
+.revreply{margin-top:auto;padding:10px 12px;border-radius:12px;background:var(--surf);font-size:14px}
+.carrev{display:inline-flex;gap:6px;align-items:center;border:0;background:none;padding:2px 0;font:inherit;font-size:14px;color:var(--ink);cursor:pointer;font-weight:600}
+.carrev:hover{text-decoration:underline}
+.ratepick{display:flex;gap:4px}
+.ratepick button{font-size:38px;line-height:1;border:0;background:none;cursor:pointer;color:var(--line);padding:2px 4px;border-radius:8px}
+.ratepick button.on{color:#f59e0b}
+.ratepick button:focus-visible{outline:3px solid var(--co)}
+.ratebox{margin-top:8px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);display:flex;gap:8px 12px;align-items:center;flex-wrap:wrap}
+.revlist{display:grid;gap:12px}
+.revitem{border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:8px;background:var(--card)}
+.revitem.hid{opacity:.6;border-style:dashed}
 .psort{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;margin:22px 0 14px}
 .heroprev{position:relative;width:100%;max-width:360px;aspect-ratio:3/1;border-radius:12px;overflow:hidden;background:var(--band);border:1px solid var(--line)}
 .heroprev img,.heroprev svg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}

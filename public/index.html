@@ -6,7 +6,7 @@
 <title>Car Rental System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=202611271208">
+<link rel="stylesheet" href="css/style.css?v=202611272212">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -89,6 +89,7 @@
   <section id="v-my-history" class="view hide">
     <div class="wrap">
       <div class="head"><div><h1>My history</h1><p class="sub">Every booking you've made with us, with your totals. Download it to keep your own record.</p></div><button type="button" class="btn go" id="hiXlsx">Download Excel</button></div>
+      <div id="hiRate"></div>
       <div class="stats" id="hiStats"></div>
       <div class="hifil">
         <div class="chips" id="hiPer" role="group" aria-label="Period"><button type="button" class="chip" data-hper="all" aria-pressed="true">All time</button><button type="button" class="chip" data-hper="year" aria-pressed="false">This year</button><button type="button" class="chip" data-hper="last" aria-pressed="false">Last year</button></div>
@@ -229,6 +230,14 @@
   </section>
 
   <!-- ADMIN: SETTINGS -->
+  <section id="v-reviews" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1>Reviews</h1><p class="sub">Feedback from customers after they return a car. Reviews show on the Cars page right away. Hide one that's abusive or not about the rental, and reply to say thanks.</p></div></div>
+      <div class="stats" id="arStats"></div>
+      <div class="chips" id="arFil" role="group" aria-label="Show" style="margin-bottom:14px"><button type="button" class="chip" data-arf="all" aria-pressed="true">All</button><button type="button" class="chip" data-arf="shown" aria-pressed="false">Shown</button><button type="button" class="chip" data-arf="hidden" aria-pressed="false">Hidden</button><button type="button" class="chip" data-arf="noreply" aria-pressed="false">Not replied</button></div>
+      <div class="revlist" id="arList"></div>
+    </div>
+  </section>
   <section id="v-settings" class="view hide">
     <div class="wrap">
       <div class="head"><div><h1>Settings</h1><p class="sub">Prices and rules customers see when they book. Changes apply to new bookings; existing bookings keep their price.</p></div></div>
@@ -342,6 +351,15 @@
         </div>
         <div class="strip" id="strip" tabindex="0" aria-label="Recent activity"></div>
         <div class="dots" id="stripDots" aria-hidden="true"></div>
+      </div>
+    </section>
+    <section class="revband hide" id="revBand" aria-labelledby="rvT">
+      <div class="wrap">
+        <div class="bandhead">
+          <div><h2 id="rvT">What our renters say</h2><div class="revavg" id="revAvg"></div></div>
+          <div class="acts"><button class="btn sm" id="rPrev" aria-label="Previous reviews">‹</button><button class="btn sm" id="rNext" aria-label="Next reviews">›</button></div>
+        </div>
+        <div class="strip" id="revStrip" tabindex="0" aria-label="Reviews from renters"></div>
       </div>
     </section>
 </main>
@@ -578,6 +596,24 @@
 </dialog>
 
 <!-- Confirm -->
+<dialog id="dRate" aria-labelledby="rateT">
+  <form id="rateForm" novalidate>
+    <div class="dh"><h2 id="rateT">Rate your rental</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+    <div class="db">
+      <p id="rateCar" style="margin:0" class="small"></p>
+      <div><span style="display:block;font-weight:650;margin-bottom:4px" id="rateLbl">How was it?</span><div class="ratepick" id="ratePick" role="radiogroup" aria-labelledby="rateLbl"><button type="button" role="radio" aria-checked="false" data-star="1" aria-label="1 star">★</button><button type="button" role="radio" aria-checked="false" data-star="2" aria-label="2 stars">★</button><button type="button" role="radio" aria-checked="false" data-star="3" aria-label="3 stars">★</button><button type="button" role="radio" aria-checked="false" data-star="4" aria-label="4 stars">★</button><button type="button" role="radio" aria-checked="false" data-star="5" aria-label="5 stars">★</button></div><p class="small" id="rateWord" style="margin:2px 0 0"></p></div>
+      <div><label for="rateText">Tell other renters about it (optional)</label><textarea id="rateText" maxlength="600" placeholder="e.g. Clean car, friendly driver, easy pickup at the airport."></textarea></div>
+      <label class="check" style="margin:0"><input type="checkbox" id="rateAnon">Post anonymously</label>
+      <p class="small" id="rateShown" style="margin:0"></p>
+      <p class="err" id="rateErr" role="alert"></p>
+    </div>
+    <div class="df"><button type="button" class="btn" data-close>Cancel</button><button class="btn go" id="rateSave">Post review</button></div>
+  </form>
+</dialog>
+<dialog id="dRevs" aria-labelledby="rvsT" style="width:min(720px,calc(100% - 20px))">
+  <div class="dh"><h2 id="rvsT">Reviews</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+  <div class="db" id="rvsBody"></div>
+</dialog>
 <dialog id="dHist" aria-labelledby="hiT" style="width:min(900px,calc(100% - 20px))">
   <div class="dh"><h2 id="hiT">Booking</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
   <div class="db mine" id="hiBody"></div>
@@ -602,6 +638,6 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<script src="js/app.js?v=202611271208"></script>
+<script src="js/app.js?v=202611272212"></script>
 </body>
 </html>
