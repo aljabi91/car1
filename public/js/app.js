@@ -238,6 +238,24 @@ function renderStrip(){
 
 /* ---------- render: my bookings ---------- */
 const ORDER=['pending','approved','active','completed'];
+/* pickup point: the office by default, or a place the customer chooses */
+const GMAP_RE=/^https:\/\/((www\.)?google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl\/maps)\S*$/i;
+const placeDir=pl=>pl.link||`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pl.text)}`;
+function pickHtml(b){
+  if(!['pending','approved','active'].includes(b.status))return'';
+  const can=['pending','approved'].includes(b.status),own=b.meetAt?.text,m=mapInfo();
+  const btn=t=>can?`<button type="button" class="btn sm" data-meet="${esc(b.id)}">${t}</button>`:'';
+  if(own)return`<div class="pickpt">${ic2('pin')}<span style="flex:1;min-width:200px"><b>Pickup point (your choice):</b> ${esc(own)}<br><span class="small">The office will confirm. A delivery fee may apply.</span></span><a class="btn sm go" href="${esc(placeDir(b.meetAt))}" target="_blank" rel="noopener">Open map</a>${btn('Change')}${can?`<button type="button" class="btn sm" data-meetx="${esc(b.id)}">Use the office</button>`:''}</div>`;
+  if(b.pickup==='delivery')return`<div class="pickpt">${ic2('pin')}<span style="flex:1;min-width:200px"><b>Delivered to:</b> ${esc(b.address||'')}</span>${btn('Choose another place')}</div>`;
+  return`<div class="pickpt">${ic2('pin')}<span style="flex:1;min-width:200px"><b>Pickup point:</b> ${m.addr?esc(m.addr):'our office'}</span>${m.dir?`<a class="btn sm go" href="${esc(m.dir)}" target="_blank" rel="noopener">Get directions</a>`:''}${btn('Choose another place')}</div>`}
+function openMeet(id){const b=myItems().find(x=>x.id===id);if(!b)return;S.meetId=id;
+  $('#meetText').value=b.meetAt?.text||'';$('#meetLink').value=b.meetAt?.link||'';$('#meetErr').textContent='';
+  $('#meetFee').textContent=`If it's not our office, a delivery fee of ${peso(SET().delivery)} may be added. The office will confirm the place and the price with you.`;$('#dMeet').showModal();setTimeout(()=>$('#meetText').focus(),50)}
+async function setMeet(id,meetAt){const items=ownItems().map(x=>x.id===id?{...x,meetAt,updatedAt:Date.now()}:x);await saveOwner(S.uid,items)}
+$('#meetForm').addEventListener('submit',async e=>{e.preventDefault();const text=$('#meetText').value.trim().replace(/\s+/g,' '),link=$('#meetLink').value.trim();
+  if(text.length<3){$('#meetErr').textContent='Enter the place or address.';$('#meetText').focus();return}
+  if(link&&!GMAP_RE.test(link)){$('#meetErr').textContent='The link must be a Google Maps link, or leave it empty.';$('#meetLink').focus();return}
+  const b=$('#meetSave');b.disabled=true;try{await setMeet(S.meetId,{text,link,at:Date.now()});$('#dMeet').close();renderMine();toast('Pickup point saved. The office will confirm.')}catch(x){$('#meetErr').textContent='Not saved. '+(x?.message||'Try again.')}finally{b.disabled=false}});
 function renderMine(){
   $('#cancelBanner').innerHTML=policyHtml();
   const el=$('#mineList');const list=[...myItems()].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
@@ -248,7 +266,7 @@ function renderMine(){
       <div>${esc(fmt(b.start))} to ${esc(fmt(b.end))}</div>
       <div class="small">${plural(+b.days||0,'day')} · <b style="color:var(--ink)">${esc(peso(b.total))}</b> · ${b.pickup==='delivery'?'Delivered to your address':'Pick up at the office'} · Ref <span class="plate">${esc(b.ref)}</span></div>
       ${i>=0?`<ol class="track" aria-label="Booking progress">${['Requested','Approved','Picked up','Returned'].map((l,k)=>`<li class="${k<=i?'done':''}">${l}</li>`).join('')}</ol>`:''}
-      ${b.pickup!=='delivery'&&['pending','approved','active'].includes(b.status)&&mapInfo().addr?`<div class="pickpt">${ic2('pin')}<span><b>Pickup point:</b> ${esc(mapInfo().addr)}</span>${mapInfo().dir?`<a class="btn sm go" href="${esc(mapInfo().dir)}" target="_blank" rel="noopener">Get directions</a>`:''}</div>`:''}
+      ${pickHtml(b)}
       ${needsDriver(b)&&!['rejected','cancelled'].includes(b.status)?`<div class="drvline">${drvPic(b)}<span><b>Your driver:</b> ${b.driverName?`${esc(b.driverName)}, ${esc(b.driverPhone||'')}`:'<span class="small">the office will assign a driver and tell you here.</span>'}</span></div>`:''}
       ${(b.changes||[]).length?`<p class="okmsg" style="margin-top:6px;font-weight:500"><b>Changed by the office on ${esc(tAt(b.changes.at(-1).at))}:</b> ${esc(b.changes.at(-1).what)}</p>`:''}
       ${b.adminNote?`<p class="note" style="margin-top:6px"><b>Comment from the office:</b> ${esc(b.adminNote)}</p>`:''}
@@ -594,7 +612,7 @@ function openDetail(owner,id){
   $('#detBody').innerHTML=`<div class="mini"><div class="ph">${carPic(c||{name:b.carName})}</div><div><h3>${esc(b.carName)}</h3><div class="small">${esc(c?.plate||b.plate||'')}</div><span class="pill s-${esc(b.status)}">${esc(STS[b.status])}</span></div></div>
   ${clash.length?`<p class="note">Overlaps an approved booking for this car, ${esc(fmt(clash[0].start))} to ${esc(fmt(clash[0].end))}.</p>`:''}
   <dl class="kv"><dt>Full name</dt><dd>${esc(b.name)}</dd><dt>Mobile</dt><dd>${esc(b.phone)}</dd><dt>Email</dt><dd>${esc(b.email||'—')}</dd><dt>Address</dt><dd>${esc(b.address)}</dd><dt>Driver's license</dt><dd id="detLic"><span class="small">Loading photo…</span></dd><dt>Emergency contact</dt><dd>${esc(b.emergency||'—')}</dd>
-  <dt>Pickup</dt><dd>${esc(fmt(b.start))}</dd><dt>Return</dt><dd>${esc(fmt(b.end))} (${plural(+b.days||0,'day')})</dd><dt>How they get it</dt><dd>${b.pickup==='delivery'?'Deliver to address':'At the office'}</dd><dt>Extras</dt><dd>${esc((b.extras||[]).join(', ')||'None')}</dd>${needsDriver(b)?`<dt>Driver</dt><dd>${b.driverName?`<span class="drvline">${drvPic(b)}<span><b>${esc(b.driverName)}</b>, ${esc(b.driverPhone||'')}</span></span>`:'<span class="err">Needs a driver. Assign one below.</span>'}</dd>`:''}
+  <dt>Pickup</dt><dd>${esc(fmt(b.start))}</dd><dt>Return</dt><dd>${esc(fmt(b.end))} (${plural(+b.days||0,'day')})</dd><dt>How they get it</dt><dd>${b.meetAt?.text?`<b>Customer's chosen place:</b> ${esc(b.meetAt.text)} <a href="${esc(placeDir(b.meetAt))}" target="_blank" rel="noopener">Open map</a><div class="small">Chosen ${esc(tAt(b.meetAt.at||0))}. Booked as ${b.pickup==='delivery'?'delivery':'office pickup'}; use Change booking to add the delivery fee if needed.</div>`:b.pickup==='delivery'?'Deliver to address':'At the office'}</dd><dt>Extras</dt><dd>${esc((b.extras||[]).join(', ')||'None')}</dd>${needsDriver(b)?`<dt>Driver</dt><dd>${b.driverName?`<span class="drvline">${drvPic(b)}<span><b>${esc(b.driverName)}</b>, ${esc(b.driverPhone||'')}</span></span>`:'<span class="err">Needs a driver. Assign one below.</span>'}</dd>`:''}
   <dt>Total</dt><dd><b>${esc(peso(b.total))}</b> (${esc(peso(b.rate))} a day${b.extrasPerDay?` + ${esc(peso(b.extrasPerDay))} a day extras`:''}${b.delivery?` + ${esc(peso(b.delivery))} delivery`:''})</dd><dt>Deposit</dt><dd>${esc(peso(b.deposit))}</dd><dt>Customer notes</dt><dd>${esc(b.notes||'—')}</dd><dt>Requested</dt><dd>${esc(b.createdAt?new Date(b.createdAt).toLocaleString('en-PH'):'—')}</dd><dt>Terms</dt><dd>${b.termsAgreedAt?`Agreed on ${esc(tAt(b.termsAgreedAt))}`:'<span class="small">Not recorded</span>'}</dd>${(b.changes||[]).length?`<dt>Changes</dt><dd>${b.changes.map(c=>`<div><b>${esc(tAt(c.at))}:</b> ${esc(c.what)}</div>`).join('')}</dd>`:''}</dl>
   ${needsDriver(b)&&!['rejected','cancelled','completed'].includes(b.status)?`<div><label for="detDrv">Driver for this trip</label><div class="acts" style="justify-content:flex-start;flex-wrap:nowrap"><select id="detDrv" style="flex:1">${driverOpts(b.start,b.end,b.id,b.driverId)}</select><button class="btn" data-act="drv">${b.driverId?'Change driver':'Assign driver'}</button></div>${S.drivers.length?'':'<p class="hint">No drivers yet. Add them on the Drivers page.</p>'}</div>`:''}
   ${['approved','active','completed'].includes(b.status)||hasHand(b,'pickup')||hasHand(b,'ret')?`<div class="hands">${['pickup','ret'].map(sd=>{const h=b.handover?.[sd]||{};return`<section class="hand" aria-labelledby="hh-${sd}"><h3 id="hh-${sd}">${HSIDE[sd][0]}</h3><p class="small" style="margin:0">${HSIDE[sd][1]} ${esc(b.name.split(' ')[0])} can see these on their booking.</p>
@@ -896,6 +914,7 @@ function readMap(){if(S.admin)return S.notifRead||{};if(S.session?.role==='custo
 function notifList(){const out=[];const cut=Date.now()-45*864e5;
   if(S.admin){
     allBookings().forEach(b=>{if((b.createdAt||0)>cut)out.push({id:'b:'+b.id,ic:'car',t:b.createdAt,html:`<b>New booking${b.status==='pending'?' request':''}:</b> ${esc(b.name)} booked the ${esc(b.carName)}, ${esc(fmtD(b.start))} to ${esc(fmtD(b.end))}`,go:()=>openDetail(b.owner,b.id)});
+      if(b.meetAt?.at>cut&&LIVE.includes(b.status))out.push({id:`g:${b.id}:${b.meetAt.at}`,ic:'pin',t:b.meetAt.at,html:`<b>Pickup place chosen:</b> ${esc(b.name)} wants to get ${esc(b.ref)} at ${esc(cut90(b.meetAt.text))}`,go:()=>openDetail(b.owner,b.id)});
       if(b.status==='cancelled'&&b.cancelledBy==='customer'&&(b.updatedAt||0)>cut)out.push({id:'c:'+b.id,ic:'x2',t:b.updatedAt,html:`<b>Booking cancelled:</b> ${esc(b.name)} cancelled ${esc(b.ref)} (${esc(b.carName)})`,go:()=>openDetail(b.owner,b.id)})});
     allThreads().forEach(th=>{const last=[...(th.c.msgs||[])].pop();if(!last||last.at<cut)return;out.push({id:`m:${th.owner}|${th.key}|${last.at}`,ic:'chat',t:last.at,auto:!th.unreadA,html:`<b>New message from ${esc(th.name||'a customer')}:</b> ${esc(cut90(msgPreview(last)))}`,go:()=>{S.thread={owner:th.owner,key:th.key,name:th.name,phone:th.phone};S.msgScrolled=false;location.hash='#messages';route();markSeen()}})});
   }else if(S.session?.role==='customer'){
@@ -1288,6 +1307,8 @@ document.addEventListener('click',async e=>{
   const th=t.closest('[data-th]');if(th){const[o,k]=th.dataset.th.split('|');const x=getThread(o,k);S.thread={owner:o,key:k,name:x.name,phone:x.phone};S.msgScrolled=false;renderMessages();markSeen();return}
   if(t.closest('#thBack')){S.thread=null;renderMessages();return}
   const mg=t.closest('[data-msg]');if(mg){const[o,k,n,p]=mg.dataset.msg.split('|');t.closest('dialog')?.close();S.msgScrolled=false;openThread(o,k,n,p,mg.dataset.draft||'');return}
+  const mt=t.closest('[data-meet]');if(mt){openMeet(mt.dataset.meet);return}
+  const mx=t.closest('[data-meetx]');if(mx){if(!await ask('Pick up the car at our office instead?','Use the office'))return;try{await setMeet(mx.dataset.meetx,null);renderMine();toast('Pickup point: our office')}catch(x){toast('Not saved. Try again.')}return}
   const ab=t.closest('[data-askbk]');if(ab){S.draft=`About booking ${ab.dataset.askbk}: `;S.msgScrolled=false;location.hash='#messages';route();return}
   const cl=t.closest('[data-clic]');if(cl){const[o,k,n]=cl.dataset.clic.split('|');cl.disabled=true;try{const img=await licGet(o,k);img?openZoom(img,`Driver's license of ${n}`):toast(`${n} hasn't uploaded a license photo yet.`)}catch(x){toast('The license photo could not be loaded.')}finally{cl.disabled=false}return}
   const cb=t.closest('[data-cbk]');if(cb){S.adm.q=cb.dataset.cbk;S.adm.status='all';$('#admQ').value=cb.dataset.cbk;location.hash='#bookings';route();return}

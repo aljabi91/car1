@@ -6,7 +6,7 @@
 <title>Car Rental System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=202611271029">
+<link rel="stylesheet" href="css/style.css?v=202611271040">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -560,6 +560,18 @@
 </dialog>
 
 <!-- Confirm -->
+<dialog id="dMeet" aria-labelledby="meetT">
+  <form id="meetForm" novalidate>
+    <div class="dh"><h2 id="meetT">Where do you want to get the car?</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+    <div class="db">
+      <div><label for="meetText">Place or address <span class="req">*</span></label><input id="meetText" maxlength="200" placeholder="e.g. Daniel Z. Romualdez Airport, arrival area"></div>
+      <div><label for="meetLink">Google Maps link (optional)</label><input id="meetLink" type="url" placeholder="https://maps.app.goo.gl/..."><p class="hint">In Google Maps, find the place, tap <b>Share</b> and copy the link. It helps the driver find you.</p></div>
+      <p class="note" id="meetFee" style="margin:0"></p>
+      <p class="err" id="meetErr" role="alert"></p>
+    </div>
+    <div class="df"><button type="button" class="btn" data-close>Cancel</button><button class="btn go" id="meetSave">Save pickup point</button></div>
+  </form>
+</dialog>
 <dialog id="dAsk" aria-labelledby="askT">
   <div class="dh"><h2 id="askT">Are you sure?</h2></div>
   <div class="db"><p id="askMsg"></p></div>
@@ -568,6 +580,6 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<script src="js/app.js?v=202611271029"></script>
+<script src="js/app.js?v=202611271040"></script>
 </body>
 </html>

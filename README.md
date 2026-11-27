@@ -89,6 +89,7 @@ Customers can log in on any device and see their bookings, messages and details.
 - Log in to see **My bookings** with each booking's progress and assigned driver, read the office's comments, and chat in **Messages**. They can send photos with the camera button. Under each message they sent there is **Edit** (the message then shows "Edited") and **Unsend** (asks first, then removes it for both sides).
 - Edit their own details in **My details**, including uploading a new driver's license photo.
 - Cancel up to 2 days before pickup. The admin can change the number of days.
+- Choose where to get the car: each booking shows the **Pickup point** (the office by default, with Get directions). **Choose another place** lets them type a place and optionally paste a Google Maps link; **Use the office** switches back. They can change it until pickup. The office is notified, sees the place with a map link in the booking, and confirms; a delivery fee may apply, which the admin adds with Change booking.
 - See the **Pickup record** and **Return record** on each booking under My bookings: the office's photos of the car, the signed documents (photos or PDF) and the office's comments. Tapping a photo opens it larger; tapping a PDF opens it.
 - The **bell** at the top shows new messages from the office, booking approvals or rejections, and booking changes. A number shows how many are new. Tapping one opens it and marks it **Read**; **Mark all as read** clears them all.
 
