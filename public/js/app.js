@@ -29,7 +29,7 @@ const DEF_TERMS=`# Who can rent
 
 # Cancellation
 - You can cancel online up to the number of days before pickup shown on your booking. After that, message the office.`;
-const SET=()=>{const x=S.settings||{};return{contact:x.contact&&typeof x.contact==='object'?x.contact:{},siteName:String(x.siteName||'').trim()||'Car Rental',logoId:x.logoId||'',heroId:x.heroId||'',heroShade:Number.isFinite(+x.heroShade)&&x.heroShade!==undefined?+x.heroShade:60,extras:Array.isArray(x.extras)?x.extras:DEF_SET.extras,delivery:Number.isFinite(+x.delivery)&&x.delivery!==undefined?+x.delivery:DEF_SET.delivery,cancelDays:Number.isFinite(+x.cancelDays)&&x.cancelDays!==undefined?+x.cancelDays:DEF_SET.cancelDays,cancelText:typeof x.cancelText==='string'?x.cancelText.trim():'',terms:typeof x.terms==='string'?x.terms:DEF_TERMS,termsAt:+x.termsAt||0}};
+const SET=()=>{const x=S.settings||{};return{contact:x.contact&&typeof x.contact==='object'?x.contact:{},siteName:String(x.siteName||'').trim()||'Car Rental',logoId:x.logoId||'',heroId:x.heroId||'',heroShade:Number.isFinite(+x.heroShade)&&x.heroShade!==undefined?+x.heroShade:60,extras:Array.isArray(x.extras)?x.extras:DEF_SET.extras,delivery:Number.isFinite(+x.delivery)&&x.delivery!==undefined?+x.delivery:DEF_SET.delivery,cancelDays:Number.isFinite(+x.cancelDays)&&x.cancelDays!==undefined?+x.cancelDays:DEF_SET.cancelDays,cancelText:typeof x.cancelText==='string'?x.cancelText.trim():'',minAge:Number.isFinite(+x.minAge)&&x.minAge!==undefined?+x.minAge:21,terms:typeof x.terms==='string'?x.terms:DEF_TERMS,termsAt:+x.termsAt||0}};
 const hasTerms=()=>!!SET().terms.trim();
 const EX=()=>SET().extras;
 const cdTxt=()=>plural(SET().cancelDays,'day');
@@ -39,7 +39,7 @@ const STS={pending:'Pending',approved:'Approved',active:'Picked up',completed:'R
 const LIVE=['pending','approved','active'];
 const cancelBy=b=>new Date(+new Date(b.start)-SET().cancelDays*864e5);
 const canCancelNow=b=>['pending','approved'].includes(b.status)&&Date.now()<+cancelBy(b);
-const S={db:null,user:null,assets:null,uid:null,admin:false,editor:false,session:null,adminCfg:null,cfgLoaded:false,bReady:false,canWrite:true,ready:false,cars:[],gallery:[],bdocs:[],blocks:[],notifRead:null,pfCache:{},reviews:[],licCache:{},drivers:[],settings:null,chats:[],replies:[],thread:null,draft:'',local:false,adm:{status:'all',q:''},f:{type:'',trans:''},editing:null,newImg:null,dropImg:false,booking:null,step:1};
+const S={db:null,user:null,assets:null,uid:null,admin:false,editor:false,session:null,adminCfg:null,cfgLoaded:false,bReady:false,canWrite:true,ready:false,cars:[],gallery:[],bdocs:[],blocks:[],notifRead:null,pfCache:{},reviews:[],trash:[],accounts:[],licCache:{},drivers:[],settings:null,chats:[],replies:[],thread:null,draft:'',local:false,adm:{status:'all',q:''},f:{type:'',trans:''},editing:null,newImg:null,dropImg:false,booking:null,step:1};
 
 /* ---------- helpers ---------- */
 const pad=n=>String(n).padStart(2,'0');
@@ -133,7 +133,7 @@ function endSession(){S.session=null;try{sessionStorage.removeItem('cr-session')
   if(S.server){try{localStorage.removeItem('cr-token')}catch(e){}S.uid=null;S.editor=false;S.assets=null;S.db.ready(null).catch(()=>{})}}
 
 /* ---------- routing ---------- */
-const CUST=[['fleet','Cars'],['my-bookings','My bookings'],['my-history','My history'],['messages','Messages'],['my-details','My details']];
+const CUST=[['fleet','Cars'],['my-bookings','My bookings'],['my-history','My history'],['feedback','Feedback'],['messages','Messages'],['my-details','My details']];
 const ADM=[['bookings','Rentals'],['customers','Customers'],['messages','Messages'],['cars','Fleet'],['drivers','Drivers'],['photos','Recent activity'],['reviews','Reviews'],['reports','Reports'],['settings','Settings'],['fleet','Customer view']];
 const ACT_VIEWS=['fleet','my-bookings','my-details'];
 const GUEST=[['fleet','Cars'],['login','Log in']];
@@ -153,9 +153,9 @@ function route(){
   const unread=S.session?unreadCount():0;
   closeMenu();
   $('#activityBand').classList.toggle('hide',!ACT_VIEWS.includes(h));
-  $('#nav').innerHTML=items.map(([k,l])=>{const n=k==='bookings'&&S.admin?pend:k==='messages'?unread:0;return `<a href="#${k}" ${k===h?'aria-current="page"':''}>${esc(l)}${n?`<span class="count" aria-label="${n} new">${n}</span>`:''}</a>`}).join('');
+  $('#nav').innerHTML=items.map(([k,l])=>{const n=k==='bookings'&&S.admin?pend:k==='messages'?unread:k==='feedback'?toRate().length:0;return `<a href="#${k}" ${k===h?'aria-current="page"':''}>${esc(l)}${n?`<span class="count" aria-label="${n} new">${n}</span>`:''}</a>`}).join('');
   renderBell();fitHeader();
-  const tot=(S.admin?pend:0)+unread;$('#menuDot').textContent=tot;$('#menuDot').classList.toggle('hide',!tot);
+  const tot=(S.admin?pend:0)+unread+toRate().length;$('#menuDot').textContent=tot;$('#menuDot').classList.toggle('hide',!tot);
   if(S.view!==h)scrollTo(0,0);
   S.view=h;renderFindUs();renderRevBand();render();
 }
@@ -302,6 +302,16 @@ $('#hiXlsx').addEventListener('click',async()=>{const rows=histRows();if(!rows.l
   const sum=[['Item','Value'],['Customer',S.session.name],['From',st.siteName],['Downloaded',new Date().toLocaleString('en-PH')],['Period',{all:'All time',year:'This year',last:'Last year'}[S.hiPer||'all']],['Bookings shown',sel],['',''],['Rentals',m.n],['Days rented',m.days],[{text:'Total for rentals',bold:true},{money:m.spent,bold:true}],['Cancelled or not approved',m.lost]];
   try{await saveFile(makeXlsx([{name:'Summary',rows:sum,widths:[28,40],money:[]},{name:'My bookings',rows:list,widths:[12,20,22,11,22,22,7,13,26,30,12,12,12,13,18,36],money:[7,10,11,12]}]),`my-rental-history-${new Date().toISOString().slice(0,10)}.xlsx`)}
   catch(x){$('#hiErr').textContent='The file was not downloaded. '+(x?.message||'Try again.')}});
+const toRate=()=>S.session?.role==='customer'?myItems().filter(b=>b.status==='completed'&&!b.review?.stars):[];
+function renderFeedback(){if(S.session?.role!=='customer'){$('#fbTodo').innerHTML='<div class="empty"><b>Log in to give feedback</b><a class="btn go" href="#login">Log in</a></div>';$('#fbDone').innerHTML='';return}
+  const todo=toRate().sort((a,b)=>String(b.end).localeCompare(String(a.end))),done=myItems().filter(b=>b.review?.stars).sort((a,b)=>(b.review.updatedAt||0)-(a.review.updatedAt||0));
+  const head=b=>`<div style="display:flex;gap:12px;align-items:center"><div class="ph" style="width:96px;flex:none;border-radius:10px;overflow:hidden;aspect-ratio:16/10;background:var(--surf)">${carPic(carById(b.carId)||{name:b.carName})}</div><div><b>${esc(b.carName)}</b><div class="small">${esc(fmtD(b.start))} to ${esc(fmtD(b.end))} · Ref ${esc(b.ref)}</div></div></div>`;
+  $('#fbTodo').innerHTML=todo.length?todo.map(b=>`<article class="revitem">${head(b)}<div class="acts" style="justify-content:flex-start"><button type="button" class="btn go" data-rate="${esc(b.id)}">Rate your rental</button></div></article>`).join(''):'<div class="empty" style="padding:22px"><b>Nothing to rate right now</b><span>After you return a car, you can rate it here.</span></div>';
+  $('#fbDone').innerHTML=done.length?done.map(b=>{const r=b.review,pub=S.reviews.find(x=>x.id===b.id);return`<article class="revitem">${head(b)}<div>${starsHtml(r.stars)} <b>${RWORD[+r.stars]||''}</b>${r.anon?' <span class="small">· posted anonymously</span>':''}</div>${r.text?`<p style="margin:0">${esc(r.text)}</p>`:''}<div class="small">Posted ${esc(tAt(r.at||0))}${r.updatedAt&&r.updatedAt!==r.at?` · edited ${esc(tAt(r.updatedAt))}`:''}${canRateEdit(b)?` · you can edit it until ${esc(tAt((r.at||0)+7*864e5))}`:''}</div>${pub?.reply?`<div class="revreply"><b>Reply from the office:</b> ${esc(pub.reply)}</div>`:''}${canRateEdit(b)?`<div class="acts" style="justify-content:flex-start"><button type="button" class="btn sm" data-rate="${esc(b.id)}">Edit review</button></div>`:''}</article>`}).join(''):'<div class="empty" style="padding:22px"><b>No reviews yet</b></div>'}
+const myAcct=()=>S.session?.role==='customer'?(S.accounts||[]).find(x=>x.id===S.uid)||null:null;
+/* explains a username that got a number because the plain one was taken */
+const unameWhy=u=>{const m=/^(.*)-(\d+)$/.exec(u||'');return m?` Someone already had ${m[1]}, so a number was added to yours.`:''};
+const ageAt=(bd,on)=>{const[y,m,d]=bd.split('-').map(Number);const t=on?new Date(String(on).slice(0,10)+'T12:00'):new Date();let a=t.getFullYear()-y;if(t.getMonth()+1<m||(t.getMonth()+1===m&&t.getDate()<d))a--;return a};
 function renderMine(){
   $('#cancelBanner').innerHTML=policyHtml();
   /* Current: waiting, approved and picked up (soonest pickup first). History: returned, cancelled, not approved (newest first). */
@@ -480,9 +490,19 @@ function customers(){
     c.n++;if(['approved','active','completed'].includes(b.status))c.spent+=+b.total||0;if(!c.last||b.start>c.last){c.last=b.start;c.lastCar=b.carName;c.name=b.name;c.phone=b.phone;c.email=b.email||c.email;c.address=b.address||c.address}m.set(k,c)});
   return[...m.values()].sort((a,b)=>String(b.last).localeCompare(String(a.last)));
 }
+function renderTrash(){const l=[...(S.trash||[])].sort((a,b)=>(b.deletedAt||0)-(a.deletedAt||0));$('#trashSec').classList.toggle('hide',!l.length);
+  $('#trashList').innerHTML=l.map(t=>{const rejoined=S.bdocs.some(d=>d.id===t.owner)||(t.name&&allBookings().some(b=>norm(b.name)===norm(t.name)));const days=Math.max(0,Math.ceil(((t.purgeAt||0)-Date.now())/864e5));
+    return`<article class="revitem hid" style="opacity:1"><div style="display:flex;gap:8px 12px;align-items:center;flex-wrap:wrap"><b>${esc(t.name||'Customer')}</b><span class="small">${esc(t.phone||'')}${t.email?' · '+esc(t.email):''}</span><span class="cid">ID ${esc(t.owner)}</span></div>
+      ${t.why?`<div class="small"><b style="color:var(--ink)">Why:</b> ${esc(t.why)}</div>`:''}<div class="small">${plural(+t.bookings||0,'booking')} · deleted ${esc(tAt(t.deletedAt||0))} · erased automatically on ${esc(new Date(t.purgeAt||0).toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'}))} (${days} ${days===1?'day':'days'} left)</div>
+      ${rejoined?'<p class="note" style="margin:0">This person has made a new account since. The old account stays separate and can\'t be restored over the new one.</p>':''}
+      <div class="acts" style="justify-content:flex-start">${rejoined?'':`<button type="button" class="btn sm go" data-trres="${esc(t.id)}">Restore</button>`}<button type="button" class="btn sm danger" data-trdel="${esc(t.id)}|${esc(t.name||'this customer')}">Delete permanently</button></div></article>`}).join('')}
 function renderCustomers(){
-  const q=($('#custQ').value||'').toLowerCase();const list=customers().filter(c=>!q||[c.name,c.phone,c.email].join(' ').toLowerCase().includes(q));
-  $('#custTable tbody').innerHTML=list.map(c=>`<tr><td><b>${esc(c.name)}</b>${c.n>=3?' <span class="pill s-active">Regular</span>':''}<div class="small">${esc(c.email||'')}</div></td><td class="nw">${esc(c.phone)}</td><td>${esc(c.address)}</td><td class="num">${c.n}</td><td class="num">${esc(peso(c.spent))}</td><td class="nw">${esc(fmtD(c.last))}<div class="small">${esc(c.lastCar)}</div></td><td><div class="acts"><button class="btn sm" data-clic="${esc(c.owner)}|${esc(c.key)}|${esc(c.name)}">License</button><button class="btn sm" data-cbk="${esc(c.phone)}">Bookings</button><button class="btn sm go" data-msg="${esc(c.owner)}|${esc(c.key)}|${esc(c.name)}|${esc(c.phone)}">Message</button></div></td></tr>`).join('');
+  /* customers from before the login rules who would log in exactly the same way (same name, same last 4 digits) */
+  const loginKey=c=>norm(c.name)+'|'+String(c.phone||'').replace(/\D/g,'').slice(-4),seen=new Map();customers().forEach(c=>{const k=loginKey(c);seen.set(k,new Set([...(seen.get(k)||[]),c.owner]))});
+  const clash=c=>(seen.get(loginKey(c))||new Set()).size>1;
+  const q=($('#custQ').value||'').toLowerCase();const list=customers().filter(c=>!q||[c.name,c.phone,c.email,c.owner,(S.accounts.find(a=>a.id===c.owner)||{}).user].join(' ').toLowerCase().includes(q));
+  $('#custTable tbody').innerHTML=list.map(c=>`<tr><td><b>${esc(c.name)}</b>${c.n>=3?' <span class="pill s-active">Regular</span>':''}<div class="small">${esc(c.email||'')}</div><div class="cid" title="Customer ID">ID ${esc(c.owner)}</div>${(S.accounts.find(a=>a.id===c.owner)||{}).user?`<div class="cid" title="Username">Username ${esc(S.accounts.find(a=>a.id===c.owner).user)}</div>`:''}${clash(c)?'<div class="err" style="font-size:13px;margin-top:4px">Same login as another customer (same name and last 4 digits). Ask one of them to add a middle initial in My details.</div>':''}</td><td class="nw">${esc(c.phone)}</td><td>${esc(c.address)}</td><td class="num">${c.n}</td><td class="num">${esc(peso(c.spent))}</td><td class="nw">${esc(fmtD(c.last))}<div class="small">${esc(c.lastCar)}</div></td><td><div class="acts"><button class="btn sm" data-clic="${esc(c.owner)}|${esc(c.key)}|${esc(c.name)}">License</button><button class="btn sm" data-cbk="${esc(c.phone)}">Bookings</button><button class="btn sm go" data-msg="${esc(c.owner)}|${esc(c.key)}|${esc(c.name)}|${esc(c.phone)}">Message</button><button class="btn sm danger" data-custdel="${esc(c.owner)}|${esc(c.name)}">Delete</button></div></td></tr>`).join('');
+  renderTrash();
   $('#custTable').classList.toggle('hide',!list.length);$('#custEmpty').classList.toggle('hide',list.length>0);
 }
 $('#custQ').addEventListener('input',renderCustomers);
@@ -491,7 +511,9 @@ $('#custQ').addEventListener('input',renderCustomers);
 const PF=[['#pName','name'],['#pPhone','phone'],['#pEmail','email'],['#pAddr','address'],['#pEmer','emergency']];
 function latestMine(){return [...myItems()].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0]||{}}
 function fillDetails(){const p=latestMine();PF.forEach(([s,k])=>$(s).value=p[k]||'');S.pLicNew='';setThumb('#pLicThumb','');if(p.name)licGet(S.uid,cidOf(p)).then(img=>{if(!S.pLicNew)setThumb('#pLicThumb',img||'')}).catch(()=>{});detWarn()}
-function renderDetails(){if(S.detFor!==S.session?.cid){S.detFor=S.session?.cid;$('#pMsgOk').textContent='';fillDetails()}}
+function drawUser(){const ac=myAcct();$('#pUser').textContent=ac?.user||'Not set yet';$('#pBdayRow').classList.toggle('hide',!!ac?.birthday);$('#pBday').max=toLocal(new Date()).slice(0,10);
+  $('#pUserHint').innerHTML=ac?.user?`Log in with <b>${esc(ac.user)}</b> and the last 4 digits of your mobile.${esc(unameWhy(ac.user))}${ac.birthday?` Birthday on file: ${esc(new Date(ac.birthday+'T12:00').toLocaleDateString('en-PH',{month:'long',day:'numeric',year:'numeric'}))}.`:''}`:'Add your birthday and save to get your username. Until then, log in with your full name.'}
+function renderDetails(){drawUser();if(S.detFor!==S.session?.cid){S.detFor=S.session?.cid;$('#pMsgOk').textContent='';fillDetails()}}
 function detWarn(){const p=latestMine();const nn=$('#pName').value,ph=$('#pPhone').value;const msgs=[];
   if(norm(nn)&&norm(nn)!==norm(p.name))msgs.push('your login name will change to '+nn.trim().replace(/\s+/g,' '));
   const l=last4(ph);if(l.length===4&&l!==last4(p.phone))msgs.push('your password will change to '+l);
@@ -505,6 +527,9 @@ $('#detForm').addEventListener('submit',async e=>{
   if(ph.replace(/\D/g,'').length<7||!/^[+()\-\s\d]+$/.test(ph))return err('#pPhone','Enter a valid mobile number, like 0917 123 4567.');
   if(v('#pEmail')&&!/^\S+@\S+\.\S+$/.test(v('#pEmail')))return err('#pEmail','Check your email address.');
   if(!v('#pAddr'))return err('#pAddr','Enter your address.');
+  const nb=$('#pBday').value&&!myAcct()?.birthday?$('#pBday').value:'';
+  if(nb&&new Date(nb)>new Date())return err('#pBday','Enter a valid birthday.');
+  if(nb&&S.server){try{const r=await S.db.api('api/account-set',{method:'POST',body:JSON.stringify({birthday:nb})});const ac=myAcct();if(ac)Object.assign(ac,{birthday:nb,user:r.username});else S.accounts.push({id:S.uid,birthday:nb,user:r.username});drawUser();toast('Your username is '+r.username)}catch(x){return err('#pBday','Not saved. '+(x?.message||'Try again.'))}}
   const nk=norm(name),np=last4(ph);
   if(ownItems().some(b=>!isMine(b)&&norm(b.name)===nk&&last4(b.phone)===np))return err('#pName','Another customer on this device already uses this name and mobile number.');
   const cid=S.session.cid||myKey();const d={name,phone:ph,email:v('#pEmail'),address:v('#pAddr'),emergency:v('#pEmer')};
@@ -516,7 +541,7 @@ $('#detForm').addEventListener('submit',async e=>{
     if(S.chats.find(x=>x.id===S.uid)?.threads?.[cid])await writeThread('chats',S.uid,cid,x=>({...x,name,phone:ph}));
     startSession({role:'customer',name,key:nk,pass:np,cid});
     $('#pWarn').textContent='';$('#pMsgOk').textContent=`Saved. Log in next time with ${name} and password ${np}.`;route();toast('Details saved');
-  }catch(x){$('#pErr').textContent='Not saved. Check your connection and try again.'}
+  }catch(x){$('#pErr').textContent=S.server&&x?.message&&x.code!=='unavailable'?'Not saved. '+x.message:'Not saved. Check your connection and try again.'}
   finally{btn.disabled=false;btn.textContent='Save changes'}
 });
 function render(){
@@ -525,6 +550,7 @@ function render(){
   if(ACT_VIEWS.includes(v))renderStrip();
   if(v==='my-bookings')renderMine();
   if(v==='my-history')renderHistory();
+  if(v==='feedback')renderFeedback();
   if(v==='bookings')renderAdmin();
   if(v==='cars')renderCars();
   if(v==='photos')renderPhotos();
@@ -552,6 +578,7 @@ function openBooking(carId){
   $('#bStart').min=$('#bEnd').min=toLocal(new Date());
   $('#bPick').options[1].textContent=`Deliver to my address (+${peso(SET().delivery)})`;
   $('#bExtras').innerHTML=EX().map(x=>`<label class="opt"><input type="checkbox" data-x="${x.id}">${esc(x.label)}<span>+${esc(peso(x.perDay))} a day</span></label>`).join('');
+  {const ac=myAcct();$('#bBdayRow').classList.toggle('hide',S.session?.role==='admin'||!!ac?.birthday);$('#bBday').value='';$('#bBday').max=toLocal(new Date()).slice(0,10)}
   $('#bAgree').checked=false;$('#bTerms').checked=false;$('#bTermsRow').classList.toggle('hide',!hasTerms());$('#bNotes').value='';$('#bPick').value='office';
   step(1);$('#dBook').showModal();
 }
@@ -579,6 +606,8 @@ function stepError(n){
   if(n===2){
     const ph=v('#bPhone').replace(/\D/g,'');
     if(!v('#bName'))return['#bName','Enter your full name.'];
+    if(S.session?.role!=='admin'&&!myAcct()?.birthday){const bd=v('#bBday');if(!/^\d{4}-\d{2}-\d{2}$/.test(bd)||new Date(bd)>new Date())return['#bBday','Enter your birthday.'];
+      const ma=SET().minAge;if(ma>0&&ageAt(bd,calc().s)<ma)return['#bBday',`You must be at least ${ma} years old on the pickup date to rent a car.`]}
     if(ph.length<7||!/^[+()\-\s\d]+$/.test(v('#bPhone')))return['#bPhone','Enter a valid mobile number, like 0917 123 4567.'];
     if(v('#bEmail')&&!/^\S+@\S+\.\S+$/.test(v('#bEmail')))return['#bEmail','Check your email address.'];
     if(!v('#bAddr'))return['#bAddr','Enter your address.'];
@@ -613,20 +642,23 @@ $('#bookForm').addEventListener('submit',async e=>{
   const nm=v('#bName').replace(/\s+/g,' ');const prev=ownItems().find(x=>norm(x.name)===norm(nm)&&last4(x.phone)===last4(v('#bPhone')));
   const b={id:uid(),ref:ref(),cid:S.session?.role==='customer'&&isMine({name:nm,phone:v('#bPhone')})?S.session.cid:prev?cidOf(prev):tk(norm(nm),last4(v('#bPhone'))),carId:k.c.id,carName:carTitle(k.c),plate:k.c.plate||'',name:v('#bName').replace(/\s+/g,' '),phone:v('#bPhone'),email:v('#bEmail'),address:v('#bAddr'),hasLicense:true,emergency:v('#bEmer'),start:k.s,end:k.e,days:k.n,rate:+k.c.rate,extras:k.ex.map(x=>x.label),extrasDetail:k.ex.map(x=>({label:x.label,perDay:+x.perDay||0,driver:!!x.driver})),extrasPerDay:k.exDay,pickup:$('#bPick').value,delivery:k.del,total:k.total,deposit:+k.c.deposit||0,notes:v('#bNotes'),status:'pending',createdAt:Date.now()};
   if(hasTerms())b.termsAgreedAt=Date.now();
+  if($('#bBday').value&&!myAcct()?.birthday)b.birthday=$('#bBday').value;
+  let uname='';const prevUser=myAcct()?.user||'';
   try{
-    if(S.server){const r=await S.db.book({...b,tz:new Date().getTimezoneOffset(),licenseImg:S.licImg||''});Object.assign(b,r.booking)}
+    if(S.server){const r=await S.db.book({...b,tz:new Date().getTimezoneOffset(),licenseImg:S.licImg||''});Object.assign(b,r.booking);uname=r.username||''}
     else{if(S.licImg)await licSave(S.uid,b.cid,S.licImg);await saveOwner(S.uid,[...ownItems(),b])}
     $('#dBook').close();
     if(S.session?.role==='admin'){toast('Booking '+b.ref+' added');return}
     if(!isMine(b)){
       if(S.session)endSession();
-      $('#lName').value=b.name;$('#lPass').value='';$('#lErr').textContent='';
-      $('#lMsg').textContent=`Booking request sent for the ${b.carName}. Your reference is ${b.ref}. Log in to follow it: your password is the last 4 digits of ${b.phone}.`;
+      $('#lName').value=uname||b.name;$('#lPass').value='';$('#lErr').textContent='';
+      $('#lMsg').innerHTML=`Booking request sent for the ${esc(b.carName)}. Your reference is ${esc(b.ref)}.<br>${uname?`<b>Your username is ${esc(uname)}</b>.${esc(unameWhy(uname))} Your password is the last 4 digits of ${esc(b.phone)}. Write them down so you can log in next time.`:`Log in to follow it: your password is the last 4 digits of ${esc(b.phone)}.`}`;
       location.hash='#login';route();setTimeout(()=>$('#lPass').focus(),50);return;
     }
-    $('#doneBody').innerHTML=`<p>Your request for the <b>${esc(b.carName)}</b>, ${esc(fmt(b.start))} to ${esc(fmt(b.end))}, has been sent. Total: <b>${esc(peso(b.total))}</b>.</p><p>Reference <span class="plate" style="font-size:18px">${esc(b.ref)}</span></p><p class="small">The office will check and approve it. You can follow it under My bookings. You can cancel until ${esc(fmt(toLocal(cancelBy(b))))} (${esc(cdTxt())} before pickup).</p>`;
+    $('#doneBody').innerHTML=(uname&&uname!==prevUser?`<p class="okmsg" style="font-weight:500"><b>Your username is ${esc(uname)}.</b>${esc(unameWhy(uname))} Use it with the last 4 digits of your mobile to log in.</p>`:'')+`<p>Your request for the <b>${esc(b.carName)}</b>, ${esc(fmt(b.start))} to ${esc(fmt(b.end))}, has been sent. Total: <b>${esc(peso(b.total))}</b>.</p><p>Reference <span class="plate" style="font-size:18px">${esc(b.ref)}</span></p><p class="small">The office will check and approve it. You can follow it under My bookings. You can cancel until ${esc(fmt(toLocal(cancelBy(b))))} (${esc(cdTxt())} before pickup).</p>`;
     $('#dDone').showModal();
-  }catch(x){$('#bErr').textContent=S.server&&x?.message?x.message:x?.code==='quota_exceeded'?'The booking list is full. Contact the rental office.':'The booking was not sent. Check your connection and send it again.'}
+  }catch(x){if(x?.code==='name_taken'){step(2);$('#bErr').innerHTML=esc(x.message)+' <a href="#login" data-close>Log in</a>';$('#bName').focus();$('#bName').select();return}
+    $('#bErr').textContent=S.server&&x?.message?x.message:x?.code==='quota_exceeded'?'The booking list is full. Contact the rental office.':'The booking was not sent. Check your connection and send it again.'}
   finally{btn.disabled=false;btn.textContent=S.step===3?'Send booking request':'Next'}
 });
 
@@ -654,7 +686,7 @@ function openDetail(owner,id){
   $('#detT').textContent='Booking '+b.ref;
   $('#detBody').innerHTML=`<div class="mini"><div class="ph">${carPic(c||{name:b.carName})}</div><div><h3>${esc(b.carName)}</h3><div class="small">${esc(c?.plate||b.plate||'')}</div><span class="pill s-${esc(b.status)}">${esc(STS[b.status])}</span></div></div>
   ${clash.length?`<p class="note">Overlaps an approved booking for this car, ${esc(fmt(clash[0].start))} to ${esc(fmt(clash[0].end))}.</p>`:''}
-  <dl class="kv"><dt>Full name</dt><dd>${esc(b.name)}</dd><dt>Mobile</dt><dd>${esc(b.phone)}</dd><dt>Email</dt><dd>${esc(b.email||'—')}</dd><dt>Address</dt><dd>${esc(b.address)}</dd><dt>Driver's license</dt><dd id="detLic"><span class="small">Loading photo…</span></dd><dt>Emergency contact</dt><dd>${esc(b.emergency||'—')}</dd>
+  <dl class="kv"><dt>Full name</dt><dd>${esc(b.name)}</dd><dt>Customer ID</dt><dd class="cid" style="font-size:14px">${esc(owner)}</dd><dt>Username</dt><dd>${(()=>{const ac=S.accounts.find(a=>a.id===owner);return ac?.user?`<b>${esc(ac.user)}</b>${ac.birthday?` <span class="small">· born ${esc(new Date(ac.birthday+'T12:00').toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'}))}</span>`:''}`:'<span class="small">Not set yet (no birthday on file)</span>'})()}</dd><dt>Mobile</dt><dd>${esc(b.phone)}</dd><dt>Email</dt><dd>${esc(b.email||'—')}</dd><dt>Address</dt><dd>${esc(b.address)}</dd><dt>Driver's license</dt><dd id="detLic"><span class="small">Loading photo…</span></dd><dt>Emergency contact</dt><dd>${esc(b.emergency||'—')}</dd>
   <dt>Pickup</dt><dd>${esc(fmt(b.start))}</dd><dt>Return</dt><dd>${esc(fmt(b.end))} (${plural(+b.days||0,'day')})</dd><dt>How they get it</dt><dd>${b.meetAt?.text?`<b>Customer's chosen place:</b> ${esc(b.meetAt.text)} <a href="${esc(placeDir(b.meetAt))}" target="_blank" rel="noopener">Open map</a><div class="small">Chosen ${esc(tAt(b.meetAt.at||0))}. Booked as ${b.pickup==='delivery'?'delivery':'office pickup'}; use Change booking to add the delivery fee if needed.</div>`:b.pickup==='delivery'?'Deliver to address':'At the office'}${(()=>{const r=routeInfo(b);return r?`<div class="routewrap" style="margin-top:8px">${routeFrame(r,'Route from the office to '+r.to)}<a class="small" href="${esc(r.open)}" target="_blank" rel="noopener">Open route in Google Maps</a></div>`:''})()}</dd><dt>Extras</dt><dd>${esc((b.extras||[]).join(', ')||'None')}</dd>${needsDriver(b)?`<dt>Driver</dt><dd>${b.driverName?`<span class="drvline">${drvPic(b)}<span><b>${esc(b.driverName)}</b>, ${esc(b.driverPhone||'')}</span></span>`:'<span class="err">Needs a driver. Assign one below.</span>'}</dd>`:''}
   <dt>Total</dt><dd><b>${esc(peso(b.total))}</b> (${esc(peso(b.rate))} a day${b.extrasPerDay?` + ${esc(peso(b.extrasPerDay))} a day extras`:''}${b.delivery?` + ${esc(peso(b.delivery))} delivery`:''})</dd><dt>Deposit</dt><dd>${esc(peso(b.deposit))}</dd><dt>Customer notes</dt><dd>${esc(b.notes||'—')}</dd><dt>Requested</dt><dd>${esc(b.createdAt?new Date(b.createdAt).toLocaleString('en-PH'):'—')}</dd><dt>Terms</dt><dd>${b.termsAgreedAt?`Agreed on ${esc(tAt(b.termsAgreedAt))}`:'<span class="small">Not recorded</span>'}</dd>${(b.changes||[]).length?`<dt>Changes</dt><dd>${b.changes.map(c=>`<div><b>${esc(tAt(c.at))}:</b> ${esc(c.what)}</div>`).join('')}</dd>`:''}</dl>
   ${needsDriver(b)&&!['rejected','cancelled','completed'].includes(b.status)?`<div><label for="detDrv">Driver for this trip</label><div class="acts" style="justify-content:flex-start;flex-wrap:nowrap"><select id="detDrv" style="flex:1">${driverOpts(b.start,b.end,b.id,b.driverId)}</select><button class="btn" data-act="drv">${b.driverId?'Change driver':'Assign driver'}</button></div>${S.drivers.length?'':'<p class="hint">No drivers yet. Add them on the Drivers page.</p>'}</div>`:''}
@@ -689,7 +721,10 @@ function openDetail(owner,id){
     const a=e.target.closest('[data-act]')?.dataset.act;if(!a)return;const note=$('#detNote').value.trim();
     try{
       if(a==='copy'){const t=`${b.ref} ${b.carName}\n${b.name} ${b.phone} ${b.email||''}\n${b.address}\nLicense ${b.license}\n${fmt(b.start)} to ${fmt(b.end)} (${b.days} days)\nTotal ${peso(b.total)}`;await navigator.clipboard.writeText(t).then(()=>toast('Details copied'),()=>toast('Copying is blocked here'));return}
-      if(a==='delete'){if(!await ask(`Delete booking ${b.ref} for ${b.name}? This can't be undone.`,'Delete'))return;await saveOwner(owner,(S.bdocs.find(x=>x.id===owner)?.items||[]).filter(x=>x.id!==id));$('#dDet').close();toast('Booking deleted');return}
+      if(a==='delete'){const rest=(S.bdocs.find(x=>x.id===owner)?.items||[]).filter(x=>x.id!==id);
+        if(!rest.length&&S.server){if(!await ask(`This is ${b.name}'s only booking. Deleting it deletes the customer too: their booking, messages, license photo and records move to Deleted customers (at the bottom of the Customers page), where you can restore them within a year.`,'Delete booking and customer'))return;
+          await S.db.api('api/customer-delete',{method:'POST',body:JSON.stringify({owner,why:'Their only booking was deleted'})});await S.db.ready(S.db.token());$('#dDet').close();toast(`${b.name} moved to Deleted customers.`);return}
+        if(!await ask(`Delete booking ${b.ref} for ${b.name}? This can't be undone.`,'Delete'))return;await saveOwner(owner,rest);$('#dDet').close();toast('Booking deleted');return}
       if(a==='note'){await setStatus(owner,id,b.status,note);toast('Comment saved');return}
       if(a==='edit'){$('#dDet').close();openEdit(owner,id);return}
       if(a==='drv'){const dr=S.drivers.find(x=>x.id===$('#detDrv').value);if(!dr){toast('Choose a driver first');return}
@@ -785,7 +820,7 @@ function drawMapPrev(){const m=mapInfo(setContactDraft());const box=$('#setMapPr
 function renderSettings(){
   if(S.setDirty)return;const st=SET();
   S.setEx=st.extras.map(x=>({...x}));drawExRows();
-  $('#setDel').value=st.delivery;$('#setCancel').value=st.cancelDays;$('#setCancelText').value=st.cancelText;$('#setMsg').textContent='';$('#setTerms').value=st.terms;$('#setTermsSample').classList.toggle('hide',typeof S.settings?.terms==='string');
+  $('#setDel').value=st.delivery;$('#setCancel').value=st.cancelDays;$('#setMinAge').value=st.minAge;$('#setCancelText').value=st.cancelText;$('#setMsg').textContent='';$('#setTerms').value=st.terms;$('#setTermsSample').classList.toggle('hide',typeof S.settings?.terms==='string');
   $('#setName').value=st.siteName;{const c=st.contact||{};$('#setPhone').value=c.phone||'';$('#setEmail').value=c.email||'';$('#setAddr').value=c.addr||'';$('#setHours').value=c.hours||'';SOCIALS.forEach(([k,id])=>$('#'+id).value=c[k]||'');$('#setOtherL').value=c.otherLabel||'';$('#setMap').value=c.map||'';$('#setPin').value=c.pin||'';$('#setMapShow').checked=c.showMap!==false;drawMapPrev()}S.setLogo=null;S.setLogoDrop=false;S.setLogoId=st.logoId;drawLogoPrev();S.setHero=null;S.setHeroDrop=false;S.setHeroId=st.heroId;$('#setShade').value=st.heroShade;drawHeroPrev();
 }
 function drawHeroPrev(){const src=S.setHero?S.setHeroUrl:(!S.setHeroDrop&&S.setHeroId?imgUrl(S.setHeroId):'');const pv=$('#setHeroPrev');
@@ -810,7 +845,8 @@ $('#setSave').addEventListener('click',async()=>{
   const ex=S.setEx.map(x=>({id:x.id||'x-'+uid(),label:String(x.label||'').trim(),perDay:Math.max(0,+x.perDay||0),driver:!!x.driver}));
   const msg=$('#setMsg');
   if(ex.some(x=>!x.label)){msg.textContent='Give every extra a name, or remove it.';return}
-  const del=+$('#setDel').value,cd=+$('#setCancel').value;
+  const del=+$('#setDel').value,cd=+$('#setCancel').value,ma=+$('#setMinAge').value;
+  if(!(ma>=0&&ma<=99&&Number.isInteger(ma))){msg.textContent='Enter the minimum age as a whole number from 0 to 99.';$('#setMinAge').focus();return}
   if(!(del>=0)){msg.textContent='Enter a delivery fee of 0 or more.';return}
   if(!(cd>=0&&cd<=60&&Number.isInteger(cd))){msg.textContent='Enter cancellation days as a whole number from 0 to 60.';return}
   const siteName=$('#setName').value.trim().replace(/\s+/g,' ');
@@ -836,7 +872,7 @@ $('#setSave').addEventListener('click',async()=>{
     let heroId=S.setHeroDrop?'':oldHero;
     if(S.setHero){try{heroId=(await S.assets.upload(S.setHero)).id}catch(x){msg.textContent='The banner photo was not uploaded: '+(x?.message||'try a smaller picture.');return}}
     const terms=$('#setTerms').value.replace(/\s+$/,'');const termsAt=terms!==SET().terms||!(S.settings?.termsAt)?Date.now():S.settings.termsAt;
-    const data={...(S.settings||{}),extras:ex,delivery:del,cancelDays:cd,siteName,logoId,heroId,heroShade:Math.min(90,Math.max(20,+$('#setShade').value||60)),contact,terms,termsAt,cancelText:$('#setCancelText').value.trim().slice(0,1500),updatedAt:Date.now()};
+    const data={...(S.settings||{}),extras:ex,delivery:del,cancelDays:cd,siteName,logoId,heroId,heroShade:Math.min(90,Math.max(20,+$('#setShade').value||60)),contact,terms,termsAt,cancelText:$('#setCancelText').value.trim().slice(0,1500),minAge:ma,updatedAt:Date.now()};
     await serial('set',()=>S.db.doc('settings/main').set(data));
     if(oldLogo&&oldLogo!==logoId&&S.assets)S.assets.delete(oldLogo).catch(()=>{});
     if(oldHero&&oldHero!==heroId&&S.assets)S.assets.delete(oldHero).catch(()=>{});
@@ -1040,7 +1076,11 @@ function notifList(){const out=[];const cut=Date.now()-45*864e5;
       if(b.status!=='pending'&&!(b.status==='cancelled'&&b.cancelledBy==='customer'))out.push({id:`u:${b.id}:${b.status}`,ic:'car',t:ch&&ch.at>t-2000&&b.status==='approved'?t-1:t,html:`<b>Booking ${esc(b.ref)}</b> ${esc(W[b.status]||'was updated')}${b.status==='approved'&&b.driverName?` · Driver: ${esc(b.driverName)}`:''}`,go:()=>{location.hash=['pending','approved','active'].includes(b.status)?'#my-bookings':'#my-history';route()}});
       if(ch&&ch.at>cut)out.push({id:`h:${b.id}:${(b.changes||[]).length}`,ic:'car',t:ch.at,html:`<b>Booking ${esc(b.ref)} was changed:</b> ${esc(ch.what.length>100?ch.what.slice(0,100)+'…':ch.what)}`,go:()=>{location.hash=['pending','approved','active'].includes(b.status)?'#my-bookings':'#my-history';route()}})});
   }
-  if(S.session?.role==='customer')myItems().forEach(b=>{if(b.status==='completed'&&!b.review?.stars&&(b.updatedAt||0)>cut)out.push({id:`rv:${b.id}`,ic:'star',t:(b.updatedAt||0)+1,html:`<b>How was your trip with the ${esc(b.carName)}?</b> Rate your rental and help other renters.`,go:()=>{location.hash='#my-history';route();setTimeout(()=>openRate(b.id),80)}})});
+  {const ac=myAcct();if(ac?.user)out.push({id:'un:'+ac.user,ic:'user',t:ac.updatedAt||ac.createdAt||0,html:`<b>Your username is ${esc(ac.user)}</b>. Use it with the last 4 digits of your mobile to log in.${esc(unameWhy(ac.user))}`,go:()=>{location.hash='#my-details';route()}})}
+  if(S.session?.role==='customer')myItems().forEach(b=>{if(b.status!=='completed'||b.review?.stars||(b.updatedAt||0)<=cut)return;const go=()=>{location.hash='#feedback';route();setTimeout(()=>openRate(b.id),80)};
+    out.push({id:`rv:${b.id}`,ic:'star',t:(b.updatedAt||0)+1,html:`<b>How was your trip with the ${esc(b.carName)}?</b> Rate your rental and help other renters.`,go});
+    /* still no feedback 3 days later: one more reminder */
+    const later=(b.updatedAt||0)+3*864e5;if(Date.now()>=later)out.push({id:`rv2:${b.id}`,ic:'star',t:later,html:`<b>Reminder:</b> you haven't rated your rental of the ${esc(b.carName)} yet. It only takes a moment.`,go})});
   if(S.admin)S.reviews.forEach(r=>{if((r.updatedAt||0)>cut){const bk=allBookings().find(x=>x.id===r.id);out.push({id:`nr:${r.id}:${r.updatedAt}`,ic:'star',t:r.updatedAt,html:`<b>New review ${'★'.repeat(+r.stars||0)}</b> from ${esc(bk?.name||r.name||'a renter')}${r.anon?' (anonymous)':''}${r.text?': '+esc(cut90(r.text)):''}`,go:()=>{location.hash='#reviews';route()}})}});
   if(S.session?.role==='customer')myItems().forEach(b=>['pickup','ret'].forEach(sd=>{const h=b.handover?.[sd];if(!hasHand(b,sd)||!(h.updatedAt>cut))return;
     out.push({id:`p:${b.id}:${sd}:${(h.files||[]).length}:${(h.comment||'').length}`,ic:'doc',t:h.updatedAt,html:`<b>Booking ${esc(b.ref)}:</b> the office added ${sd==='pickup'?'pickup':'return'} photos and documents${h.comment?' with comments':''}`,go:()=>{location.hash=['pending','approved','active'].includes(b.status)?'#my-bookings':'#my-history';route()}})}));
@@ -1431,6 +1471,14 @@ document.addEventListener('click',async e=>{
   const t=e.target;
   if(t.closest('[data-close]')){t.closest('dialog')?.close();return}
   if(t.closest('[data-defpw]')){openSetup();return}
+  const cdx=t.closest('[data-custdel]');if(cdx&&S.admin){const[o,nm]=cdx.dataset.custdel.split('|');
+    if(!S.server){toast('Deleting customers works on your live site.');return}
+    if(!await ask(`Delete ${nm}? Their account, bookings, messages, license photo, pickup records and reviews are removed from the system. They move to Deleted customers, where you can restore them within a year. After a year they're erased for good.`,'Delete customer'))return;
+    try{await S.db.api('api/customer-delete',{method:'POST',body:JSON.stringify({owner:o})});await S.db.ready(S.db.token());toast(nm+' moved to Deleted customers.')}catch(x){toast('Not deleted. '+(x?.message||'Try again.'))}return}
+  const trr=t.closest('[data-trres]');if(trr&&S.admin){try{await S.db.api('api/customer-restore',{method:'POST',body:JSON.stringify({id:trr.dataset.trres})});await S.db.ready(S.db.token());toast('Customer restored with all their bookings and messages.')}catch(x){toast('Not restored. '+(x?.message||'Try again.'))}return}
+  const trd=t.closest('[data-trdel]');if(trd&&S.admin){const i=trd.dataset.trdel.indexOf('|'),id=trd.dataset.trdel.slice(0,i),nm=trd.dataset.trdel.slice(i+1);
+    if(!await ask(`Delete ${nm} permanently? Their bookings, messages, photos and documents are erased and can't be brought back.`,'Delete permanently'))return;
+    try{await S.db.api('api/customer-erase',{method:'POST',body:JSON.stringify({id})});await S.db.ready(S.db.token());toast('Erased permanently.')}catch(x){toast('Not deleted. '+(x?.message||'Try again.'))}return}
   if(t.closest('[data-editloc]')){e.preventDefault();location.hash='#settings';route();setTimeout(()=>{$('#setLocBox').scrollIntoView({block:'center'});$('#setPin').focus()},80);return}
   const ps=t.closest('[data-psort]');if(ps&&S.admin){const want=ps.dataset.psort;if((S.settings?.postSort==='oldest')===(want==='oldest'))return;
     try{await savePostSort(want);renderPhotos();toast(want==='oldest'?'Oldest first. Customers see the same order.':'Newest first. Customers see the same order.')}catch(x){toast('Not saved. Try again.')}return}
@@ -1584,6 +1632,8 @@ route();
   if(S.editor||S.server)db.doc('admin/config').onSnapshot(d=>{S.adminCfg=d.exists?d.data():null;S.cfgLoaded=true;restore();render()},()=>{S.cfgLoaded=true;render()});if(!S.editor)S.cfgLoaded=true;
   const timer=setTimeout(()=>{if(!S.ready){$('#fleetNote').textContent='The cars are taking a while to load. Check your connection.';S.ready=true;render()}},10000);
   const sub=(name,key,after)=>db.collection(name).onSnapshot(snap=>{S[key]=snap.docs.map(d=>({id:d.id,...d.data()}));if(name==='cars'){S.ready=true;clearTimeout(timer)}route();after&&after()},err=>{if(name==='bookings'){S.bReady=true;restore()}if(name==='cars'){S.ready=true;clearTimeout(timer);$('#fleetNote').textContent="The cars can't be loaded right now. Reload the page to try again."}render()});
-  sub('cars','cars');sub('gallery','gallery');sub('reviews','reviews');sub('bookings','bdocs',()=>{S.bReady=true;restore()});sub('blocks','blocks');if(S.editor||S.server||S.local)db.doc('admin/notifs').onSnapshot(d=>{S.notifRead=d.exists?(d.data().read||{}):{};if(S.session)renderBell()},()=>{});sub('drivers','drivers');db.doc('settings/main').onSnapshot(d=>{S.settings=d.exists?d.data():null;render()},()=>{});sub('chats','chats',()=>{if(S.view==='messages'){clearTimeout(S.seenT);S.seenT=setTimeout(markSeen,800)}});sub('replies','replies',()=>{if(S.view==='messages'){clearTimeout(S.seenT);S.seenT=setTimeout(markSeen,800)}});
+  sub('cars','cars');sub('gallery','gallery');sub('reviews','reviews');if(S.server){sub('trash','trash');sub('accounts','accounts')}sub('bookings','bdocs',()=>{S.bReady=true;restore();
+    /* the admin deleted this customer: log them out instead of showing an empty account */
+    if(S.server&&S.session?.role==='customer'){if(S.bdocs.some(d=>d.id===S.uid))S.sawOwn=true;else if(S.sawOwn){S.sawOwn=false;endSession();location.hash='#login';route();toast('Please log in again to continue.')}}});sub('blocks','blocks');if(S.editor||S.server||S.local)db.doc('admin/notifs').onSnapshot(d=>{S.notifRead=d.exists?(d.data().read||{}):{};if(S.session)renderBell()},()=>{});sub('drivers','drivers');db.doc('settings/main').onSnapshot(d=>{S.settings=d.exists?d.data():null;render()},()=>{});sub('chats','chats',()=>{if(S.view==='messages'){clearTimeout(S.seenT);S.seenT=setTimeout(markSeen,800)}});sub('replies','replies',()=>{if(S.view==='messages'){clearTimeout(S.seenT);S.seenT=setTimeout(markSeen,800)}});
 })();
 }

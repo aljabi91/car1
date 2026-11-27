@@ -6,7 +6,7 @@
 <title>Car Rental System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=202611272212">
+<link rel="stylesheet" href="css/style.css?v=202611272303">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -86,6 +86,15 @@
   </section>
 
   <!-- CUSTOMER: MY BOOKINGS -->
+  <section id="v-feedback" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1>Feedback</h1><p class="sub">Tell other renters how your rental went. Your review shows on the Cars page. You can post it anonymously.</p></div></div>
+      <h2 style="font-size:20px;margin:0 0 10px">Waiting for your feedback</h2>
+      <div class="revlist" id="fbTodo" style="margin-bottom:28px"></div>
+      <h2 style="font-size:20px;margin:0 0 10px">Your reviews</h2>
+      <div class="revlist" id="fbDone"></div>
+    </div>
+  </section>
   <section id="v-my-history" class="view hide">
     <div class="wrap">
       <div class="head"><div><h1>My history</h1><p class="sub">Every booking you've made with us, with your totals. Download it to keep your own record.</p></div><button type="button" class="btn go" id="hiXlsx">Download Excel</button></div>
@@ -115,12 +124,12 @@
         <div><h1 style="font-size:36px">Log in</h1><p class="sub" style="margin-top:6px">One login for customers and the rental office.</p></div>
         <p class="okmsg" id="lMsg"></p>
         <form id="loginForm" novalidate>
-          <div><label for="lName">Full name</label><input id="lName" autocomplete="username" placeholder="Juan Dela Cruz"><p class="hint">Admin: use your admin username.</p></div>
+          <div><label for="lName">Username</label><input id="lName" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="e.g. aljonabines0130"><p class="hint">Your first and last name plus your birth month and day, for example <b>aljonabines0130</b>. Customers from before can still use their full name until they add their birthday. Admin: use your admin username.</p></div>
           <div><label for="lPass">Password</label><div class="pw"><input id="lPass" type="password" autocomplete="current-password" placeholder="Last 4 digits of your mobile"><button type="button" class="btn sm ghost" id="lShow">Show</button></div><p class="hint">Customers: for 0917 123 4567, the password is 4567.</p></div>
           <p class="err" id="lErr" role="alert"></p>
           <button class="btn go lg" id="lBtn" style="width:100%">Log in</button>
         </form>
-        <p class="small">New customer? <a href="#fleet">Choose a car</a> and fill in the booking form first. You log in with the name and mobile number from that form.</p>
+        <p class="small">New customer? <a href="#fleet">Choose a car</a> and fill in the booking form first. You get your username when you send it.</p>
       </div>
     </div>
   </section>
@@ -170,7 +179,9 @@
       <div class="head"><div><h1>My details</h1><p class="sub">Keep your details up to date. They fill in your next booking form automatically and the office sees the new details on all your bookings.</p></div></div>
       <form class="lcard" id="detForm" novalidate style="width:min(620px,100%)">
         <p class="okmsg" id="pMsgOk"></p>
-        <div><label for="pName">Full name <span class="req">*</span></label><input id="pName" autocomplete="name"><p class="hint">This is also your login name.</p></div>
+        <div class="locbox" style="gap:6px"><span style="font-weight:650">Your username</span><div id="pUser" style="font-size:20px;font-weight:800"></div><p class="hint" id="pUserHint" style="margin:0"></p>
+          <div id="pBdayRow"><label for="pBday">Birthday</label><input id="pBday" type="date" autocomplete="bday"></div></div>
+        <div><label for="pName">Full name <span class="req">*</span></label><input id="pName" autocomplete="name"><p class="hint">Shown on your bookings.</p></div>
         <div class="two">
           <div><label for="pPhone">Mobile number <span class="req">*</span></label><input id="pPhone" type="tel" autocomplete="tel"><p class="hint">Its last 4 digits are your password.</p></div>
           <div><label for="pEmail">Email</label><input id="pEmail" type="email" autocomplete="email"></div>
@@ -191,9 +202,14 @@
   <section id="v-customers" class="view hide">
     <div class="wrap">
       <div class="head"><div><h1>Customers</h1><p class="sub">Everyone who has rented or asked to rent, with their contact details and totals.</p></div></div>
-      <div class="tools"><input id="custQ" placeholder="Search name, mobile or email" aria-label="Search customers"></div>
+      <div class="tools"><input id="custQ" placeholder="Search name, mobile, email, username or customer ID" aria-label="Search customers"></div>
       <div class="scroll"><table class="stack" id="custTable"><thead><tr><th>Customer</th><th>Mobile</th><th>Address</th><th class="num">Rentals</th><th class="num">Total spent</th><th>Last rental</th><th></th></tr></thead><tbody></tbody></table></div>
       <div class="empty hide" id="custEmpty"><b>No customers yet</b><span>People who book a car will show up here.</span></div>
+      <section id="trashSec" class="hide" style="margin-top:34px" aria-labelledby="trT">
+        <h2 id="trT">Deleted customers</h2>
+        <p class="sub" style="margin:4px 0 12px">Hidden from the system and from the customer. Restore within a year, or delete permanently. After a year they're erased automatically.</p>
+        <div class="revlist" id="trashList"></div>
+      </section>
     </div>
   </section>
 
@@ -262,6 +278,7 @@
           <div class="card" style="display:grid;gap:12px">
             <h2>Fees and rules</h2>
             <div><label for="setDel">Delivery fee (₱)</label><input id="setDel" type="number" min="0" step="50"></div>
+            <div><label for="setMinAge">Minimum age to rent (years)</label><input id="setMinAge" type="number" min="0" max="99" step="1"><p class="hint">Checked against the customer's birthday on the pickup date. 0 means no age check.</p></div>
             <div><label for="setCancel">Customers can cancel up to this many days before pickup</label><input id="setCancel" type="number" min="0" max="60" step="1"><p class="hint">The Cancel button on My bookings follows this number.</p></div>
             <div><label for="setCancelText">Your cancellation policy (optional)</label><textarea id="setCancelText" maxlength="1500" rows="4" placeholder="e.g. Free cancellation up to 2 days before pickup. If you cancel later or don't show up, the first day's rental is charged."></textarea><p class="hint">Shown to customers when they book and on My bookings, in your own words. Leave it empty to show the standard sentence.</p></div>
           </div>
@@ -403,9 +420,10 @@
       </div>
       <div class="wp hide" data-p="2">
         <div style="display:grid;gap:14px">
-          <div><label for="bName">Full name <span class="req">*</span></label><input id="bName" autocomplete="name"><p class="hint">You'll use this name to log in.</p></div>
+          <div><label for="bName">Full name <span class="req">*</span></label><input id="bName" autocomplete="name"><p class="hint">First and last name, as on your driver's license.</p></div>
+          <div id="bBdayRow"><label for="bBday">Birthday <span class="req">*</span></label><input id="bBday" type="date" autocomplete="bday"><p class="hint" id="bBdayHint">Your username is made from your first and last name and your birthday, for example aljonabines0130.</p></div>
           <div class="two">
-            <div><label for="bPhone">Mobile number <span class="req">*</span></label><input id="bPhone" type="tel" autocomplete="tel" placeholder="0917 123 4567"><p class="hint">Its last 4 digits become your password.</p></div>
+            <div><label for="bPhone">Mobile number <span class="req">*</span></label><input id="bPhone" type="tel" autocomplete="tel" placeholder="0917 123 4567"><p class="hint">Its last 4 digits are your password.</p></div>
             <div><label for="bEmail">Email</label><input id="bEmail" type="email" autocomplete="email"></div>
           </div>
           <div><label for="bAddr">Address <span class="req">*</span></label><textarea id="bAddr" autocomplete="street-address" placeholder="House no., street, barangay, city, province"></textarea></div>
@@ -638,6 +656,6 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<script src="js/app.js?v=202611272212"></script>
+<script src="js/app.js?v=202611272303"></script>
 </body>
 </html>
