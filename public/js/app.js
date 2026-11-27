@@ -736,11 +736,17 @@ function renderTerms(){const st=SET();const d=termsDate();
   $('#termsSub').textContent=(d?`Last updated ${d}. `:'')+'Please read these before you book. When you send a booking, you agree to them.';
   $('#termsBody').innerHTML=st.terms.trim()?termsHtml(st.terms):'<p>There are no terms and conditions yet.</p>';
   $('#termsEdit').classList.toggle('hide',!S.admin);$('#termsBook').classList.toggle('hide',!!S.admin)}
+function setContactDraft(){return{addr:$('#setAddr').value.trim(),pin:$('#setPin').value.trim(),map:$('#setMap').value.trim(),mapFull:$('#setMap').value.trim()===(SET().contact?.map||'')?SET().contact?.mapFull||'':'',showMap:true}}
+function drawMapPrev(){const m=mapInfo(setContactDraft());const box=$('#setMapPrev');
+  const pinBad=$('#setPin').value.trim()&&!parsePin($('#setPin').value);
+  $('#setMapUse').innerHTML=pinBad?'<span class="err">The pin must be two numbers, such as 11.24430, 125.00390.</span>':({pin:'Using your exact pin.',link:'Using the pin from your Google Maps link.',embed:'Using the map you embedded.',address:'Using the office address. Google may put the pin on a nearby place; add the exact pin to fix it.'}[m.using]||'Enter the office address or the exact pin to show a map.');
+  if(box.dataset.src===m.embed)return;box.dataset.src=m.embed;box.innerHTML=m.embed?`<iframe src="${esc(m.embed)}" title="Map preview" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`:''}
+['setAddr','setPin','setMap'].forEach(id=>$('#'+id).addEventListener('input',()=>{clearTimeout(S.mapPrevT);S.mapPrevT=setTimeout(drawMapPrev,600)}));
 function renderSettings(){
   if(S.setDirty)return;const st=SET();
   S.setEx=st.extras.map(x=>({...x}));drawExRows();
   $('#setDel').value=st.delivery;$('#setCancel').value=st.cancelDays;$('#setCancelText').value=st.cancelText;$('#setMsg').textContent='';$('#setTerms').value=st.terms;$('#setTermsSample').classList.toggle('hide',typeof S.settings?.terms==='string');
-  $('#setName').value=st.siteName;{const c=st.contact||{};$('#setPhone').value=c.phone||'';$('#setEmail').value=c.email||'';$('#setAddr').value=c.addr||'';$('#setHours').value=c.hours||'';SOCIALS.forEach(([k,id])=>$('#'+id).value=c[k]||'');$('#setOtherL').value=c.otherLabel||'';$('#setMap').value=c.map||'';$('#setMapShow').checked=c.showMap!==false}S.setLogo=null;S.setLogoDrop=false;S.setLogoId=st.logoId;drawLogoPrev();S.setHero=null;S.setHeroDrop=false;S.setHeroId=st.heroId;$('#setShade').value=st.heroShade;drawHeroPrev();
+  $('#setName').value=st.siteName;{const c=st.contact||{};$('#setPhone').value=c.phone||'';$('#setEmail').value=c.email||'';$('#setAddr').value=c.addr||'';$('#setHours').value=c.hours||'';SOCIALS.forEach(([k,id])=>$('#'+id).value=c[k]||'');$('#setOtherL').value=c.otherLabel||'';$('#setMap').value=c.map||'';$('#setPin').value=c.pin||'';$('#setMapShow').checked=c.showMap!==false;drawMapPrev()}S.setLogo=null;S.setLogoDrop=false;S.setLogoId=st.logoId;drawLogoPrev();S.setHero=null;S.setHeroDrop=false;S.setHeroId=st.heroId;$('#setShade').value=st.heroShade;drawHeroPrev();
 }
 function drawHeroPrev(){const src=S.setHero?S.setHeroUrl:(!S.setHeroDrop&&S.setHeroId?imgUrl(S.setHeroId):'');const pv=$('#setHeroPrev');
   pv.style.setProperty('--shade',(+$('#setShade').value||60)/100);
@@ -770,11 +776,17 @@ $('#setSave').addEventListener('click',async()=>{
   const siteName=$('#setName').value.trim().replace(/\s+/g,' ');
   if(!siteName){msg.textContent='Enter a website name.';$('#setName').focus();return}
   if(S.setLogo&&!S.assets){msg.textContent='Only the admin can upload a logo.';return}
-  const contact={phone:$('#setPhone').value.trim(),email:$('#setEmail').value.trim(),addr:$('#setAddr').value.trim(),hours:$('#setHours').value.trim(),otherLabel:$('#setOtherL').value.trim(),map:$('#setMap').value.trim().slice(0,3000),showMap:$('#setMapShow').checked};SOCIALS.forEach(([k,id])=>contact[k]=$('#'+id).value.trim());
+  const contact={phone:$('#setPhone').value.trim(),email:$('#setEmail').value.trim(),addr:$('#setAddr').value.trim(),hours:$('#setHours').value.trim(),otherLabel:$('#setOtherL').value.trim(),map:$('#setMap').value.trim().slice(0,3000),pin:$('#setPin').value.trim(),mapFull:'',showMap:$('#setMapShow').checked};SOCIALS.forEach(([k,id])=>contact[k]=$('#'+id).value.trim());
   if(contact.email&&!/^\S+@\S+\.\S+$/.test(contact.email)){msg.textContent='Check the email address in Contact details.';$('#setEmail').focus();return}
   for(const [k,id,l] of SOCIALS){if(contact[k]&&!/^https:\/\/\S+\.\S+/i.test(contact[k])){msg.textContent=`The ${l} link must start with https://`;$('#'+id).focus();return}}
   if(contact.map&&!/src=["']https:\/\/www\.google\.com\/maps\/embed\?/i.test(contact.map)&&!/^https:\/\/((www\.)?google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl\/maps)\S*$/i.test(contact.map)){msg.textContent='The office location must be the embed code from Google Maps (Share, then Embed a map) or a Google Maps link.';$('#setMap').focus();return}
-  if(contact.showMap&&!contact.map&&!contact.addr){msg.textContent='To show the map, enter the office address or paste the Google Maps location.';$('#setAddr').focus();return}
+  if(contact.pin&&!parsePin(contact.pin)){msg.textContent='The exact pin must be two numbers, such as 11.24430, 125.00390.';$('#setPin').focus();return}
+  if(contact.pin)contact.pin=parsePin(contact.pin).replace(',',', ');
+  if(/^https:\/\/(maps\.app\.goo\.gl|goo\.gl)\//i.test(contact.map)){
+    if(contact.map===(SET().contact?.map||''))contact.mapFull=SET().contact?.mapFull||'';
+    else if(S.server){try{contact.mapFull=String((await S.db.api('api/map-resolve',{method:'POST',body:JSON.stringify({url:contact.map})})).url||'')}catch(x){contact.mapFull=''}}
+    if(!contact.pin&&!llOf(contact.mapFull))toast("Saved, but the exact pin couldn't be read from that short link. Add the pin numbers for an exact spot.")}
+  if(contact.showMap&&!contact.map&&!contact.addr&&!contact.pin){msg.textContent='To show the map, enter the office address or paste the Google Maps location.';$('#setAddr').focus();return}
   if(contact.other&&!contact.otherLabel){msg.textContent='Give the other link a name, such as "Viber community".';$('#setOtherL').focus();return}
   if(S.setHero&&!S.assets){msg.textContent='Only the admin can upload a banner photo.';return}
   const b=$('#setSave');b.disabled=true;const oldLogo=SET().logoId,oldHero=SET().heroId;
@@ -947,15 +959,22 @@ $('#nAll').addEventListener('click',e=>{e.stopPropagation();markRead((S.nList||[
 document.addEventListener('click',e=>{if(!$('#nPanel').hidden&&!e.target.closest('#notifWrap')){$('#nPanel').hidden=true;$('#bellBtn').setAttribute('aria-expanded','false')}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#nPanel').hidden){$('#nPanel').hidden=true;$('#bellBtn').focus()}});
 /* office location: from the pasted Google Maps embed code or link, or the office address */
-function mapInfo(){const c=SET().contact||{};const raw=String(c.map||'').trim(),addr=String(c.addr||'').trim();
+const PIN_RE=/^\s*\(?\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*\)?\s*$/;
+function parsePin(v){const m=PIN_RE.exec(String(v||''));if(!m)return'';const la=+m[1],lo=+m[2];return Math.abs(la)<=90&&Math.abs(lo)<=180&&(la||lo)?`${la},${lo}`:''}
+const GLINK_RE=/^https:\/\/((www\.)?google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl\/maps)\S*$/i;
+const llOf=u=>{const m=/@(-?\d+\.\d+),(-?\d+\.\d+)/.exec(u||'')||/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/.exec(u||'')||/[?&](?:q|query|ll|destination)=(-?\d+\.\d+)(?:,|%2C)\s*(-?\d+\.\d+)/i.exec(u||'');return m?m[1]+','+m[2]:''};
+/* office location: exact pin, else a pin inside the pasted link or embed code, else the office address */
+function mapInfo(cc){const c=cc||SET().contact||{};const raw=String(c.map||'').trim(),addr=String(c.addr||'').trim();
   const em=/src=["'](https:\/\/www\.google\.com\/maps\/embed\?[^"'<>\s]+)["']/i.exec(raw);
-  const link=!em&&/^https:\/\/((www\.)?google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl\/maps)\S*$/i.test(raw)?raw:'';
-  const ll=/@(-?\d+\.\d+),(-?\d+\.\d+)/.exec(link)||/[?&](?:q|query|ll)=(-?\d+\.\d+),\s*(-?\d+\.\d+)/.exec(link);const coords=ll?ll[1]+','+ll[2]:'';
-  const place=coords||addr;
-  const embed=em?em[1].replace(/&amp;/g,'&'):place?`https://www.google.com/maps?q=${encodeURIComponent(place)}&z=16&output=embed`:'';
+  const link=!em&&GLINK_RE.test(raw)?raw:'';
+  const emPin=em?(m=>m?m[2]+','+m[1]:'')(/!2d(-?\d+\.\d+)!3d(-?\d+\.\d+)/.exec(em[1])):'';
+  const pin=parsePin(c.pin),fromLink=llOf(link)||llOf(c.mapFull);
+  const coords=pin||fromLink||emPin;const place=coords||addr;
+  const using=pin?'pin':fromLink?'link':em?'embed':addr?'address':'';
+  const embed=em&&!pin?em[1].replace(/&amp;/g,'&'):place?`https://www.google.com/maps?q=${encodeURIComponent(place)}&z=17&output=embed`:'';
   const dir=place?`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place)}`:link;
   const open=link||(place?`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`:'');
-  return{embed,dir,open,addr,place,show:c.showMap!==false&&!!embed}}
+  return{embed,dir,open,addr,place,using,show:c.showMap!==false&&!!embed}}
 /* driving route from the office to the customer's chosen place (or delivery address) */
 function routeInfo(b){const o=mapInfo().place;const own=b.meetAt?.text?b.meetAt:null;
   const destText=own?own.text:b.pickup==='delivery'?String(b.address||'').trim():'';if(!o||!destText)return null;
@@ -967,7 +986,7 @@ const routeFrame=(r,title)=>`<div class="routebox"><iframe src="${esc(r.embed)}"
 function renderFindUs(){const st=SET(),c=st.contact||{},m=mapInfo();const box=$('#findUs');box.classList.toggle('hide',!(m.show&&S.view==='fleet'));if(!m.show)return;
   $('#fuSub').textContent=`Pick up your car at our office${m.addr?'':''}, or we deliver to your address.`;
   $('#fuList').innerHTML=[m.addr&&['Address',m.addr],c.hours&&['Office hours',c.hours],c.phone&&['Phone',c.phone]].filter(Boolean).map(([k,v])=>`<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
-  $('#fuDir').href=m.dir||'#';$('#fuDir').classList.toggle('hide',!m.dir);$('#fuOpen').href=m.open||'#';$('#fuOpen').classList.toggle('hide',!m.open);
+  $('#fuEdit').classList.toggle('hide',!S.admin);$('#fuDir').href=m.dir||'#';$('#fuDir').classList.toggle('hide',!m.dir);$('#fuOpen').href=m.open||'#';$('#fuOpen').classList.toggle('hide',!m.open);
   if(S.mapSrc!==m.embed){S.mapSrc=m.embed;$('#fuMap').innerHTML=`<iframe src="${esc(m.embed)}" title="Map showing ${esc(st.siteName)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>`}}
 function renderFooter(){const st=SET();const c=st.contact||{};$('#footTermsLi').classList.toggle('hide',!st.terms.trim());
   $('#footName').textContent=st.siteName;$('#footLogo').innerHTML=st.logoId?`<img src="${esc(imgUrl(st.logoId))}" alt="">`:'<svg width="34" height="22" style="color:#fff"><use href="#i-car"/></svg>';
@@ -1310,6 +1329,7 @@ document.addEventListener('click',async e=>{
   const t=e.target;
   if(t.closest('[data-close]')){t.closest('dialog')?.close();return}
   if(t.closest('[data-defpw]')){openSetup();return}
+  if(t.closest('[data-editloc]')){e.preventDefault();location.hash='#settings';route();setTimeout(()=>{$('#setLocBox').scrollIntoView({block:'center'});$('#setPin').focus()},80);return}
   const ps=t.closest('[data-psort]');if(ps&&S.admin){const want=ps.dataset.psort;if((S.settings?.postSort==='oldest')===(want==='oldest'))return;
     try{await savePostSort(want);renderPhotos();toast(want==='oldest'?'Oldest first. Customers see the same order.':'Newest first. Customers see the same order.')}catch(x){toast('Not saved. Try again.')}return}
   const dp=t.closest('[data-drvpic]');if(dp){openZoom(dp.src,dp.alt);return}

@@ -441,6 +441,8 @@ nav a:hover{border-radius:10px}
 .routebox{border-radius:14px;overflow:hidden;border:1px solid var(--line);aspect-ratio:16/9;background:var(--surf);width:100%}
 .routebox iframe{width:100%;height:100%;border:0;display:block}
 .routewrap{display:grid;gap:8px;width:100%}
+.locbox{display:grid;gap:12px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}
+.locbox .mapbox{aspect-ratio:16/9;box-shadow:none}
 .pickpt{display:flex;gap:8px 10px;align-items:center;flex-wrap:wrap;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
 .pickpt svg{width:20px;height:20px;color:var(--co);flex:none}
 .foot-site .dir{color:#ffb067;font-weight:700;white-space:nowrap}
