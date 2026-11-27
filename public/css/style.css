@@ -446,6 +446,8 @@ nav a:hover{border-radius:10px}
 .pickpt{display:flex;gap:8px 10px;align-items:center;flex-wrap:wrap;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
 .pickpt svg{width:20px;height:20px;color:var(--co);flex:none}
 .foot-site .dir{color:#ffb067;font-weight:700;white-space:nowrap}
+.hifil{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
+.hifil select{min-width:220px}
 .psort{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;margin:22px 0 14px}
 .heroprev{position:relative;width:100%;max-width:360px;aspect-ratio:3/1;border-radius:12px;overflow:hidden;background:var(--band);border:1px solid var(--line)}
 .heroprev img,.heroprev svg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}

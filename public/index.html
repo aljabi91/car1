@@ -6,7 +6,7 @@
 <title>Car Rental System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=202611271153">
+<link rel="stylesheet" href="css/style.css?v=202611271208">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -86,9 +86,22 @@
   </section>
 
   <!-- CUSTOMER: MY BOOKINGS -->
+  <section id="v-my-history" class="view hide">
+    <div class="wrap">
+      <div class="head"><div><h1>My history</h1><p class="sub">Every booking you've made with us, with your totals. Download it to keep your own record.</p></div><button type="button" class="btn go" id="hiXlsx">Download Excel</button></div>
+      <div class="stats" id="hiStats"></div>
+      <div class="hifil">
+        <div class="chips" id="hiPer" role="group" aria-label="Period"><button type="button" class="chip" data-hper="all" aria-pressed="true">All time</button><button type="button" class="chip" data-hper="year" aria-pressed="false">This year</button><button type="button" class="chip" data-hper="last" aria-pressed="false">Last year</button></div>
+        <div><label for="hiSt" class="hide">Status</label><select id="hiSt"><option value="all">All bookings</option><option value="current">Current (waiting, approved, picked up)</option><option value="completed">Returned</option><option value="cancelled">Cancelled</option><option value="rejected">Not approved</option></select></div>
+      </div>
+      <div id="hiTable"></div>
+      <p class="err" id="hiErr" role="alert"></p>
+    </div>
+  </section>
   <section id="v-my-bookings" class="view hide">
     <div class="wrap">
       <div class="head"><div><h1>My bookings</h1><p class="sub">Each booking shows how far along it is.</p></div><a class="btn go" href="#fleet">Book another car</a></div>
+      <p class="small" id="mineHistLink" style="margin:-6px 0 14px"></p>
       <p class="note" style="margin-bottom:16px" id="cancelBanner"></p>
       <div class="mine" id="mineList"></div>
     </div>
@@ -565,6 +578,10 @@
 </dialog>
 
 <!-- Confirm -->
+<dialog id="dHist" aria-labelledby="hiT" style="width:min(900px,calc(100% - 20px))">
+  <div class="dh"><h2 id="hiT">Booking</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+  <div class="db mine" id="hiBody"></div>
+</dialog>
 <dialog id="dMeet" aria-labelledby="meetT">
   <form id="meetForm" novalidate>
     <div class="dh"><h2 id="meetT">Where do you want to get the car?</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
@@ -585,6 +602,6 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<script src="js/app.js?v=202611271153"></script>
+<script src="js/app.js?v=202611271208"></script>
 </body>
 </html>

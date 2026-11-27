@@ -86,6 +86,8 @@ Customers can log in on any device and see their bookings, messages and details.
 - Read the **Terms and conditions** page in the menu (also linked at the bottom of every page). Before sending a booking they must tick "I have read and agree to the Terms and conditions"; the link opens the terms without leaving the form.
 - Pick dates to see which cars are free and the total price.
 - Book in 3 steps: dates and extras → personal details and a **photo of their driver's license** → check and send. The photo shows in a small box; tapping it opens it larger, and tapping again zooms in.
+- **My bookings** shows only current bookings (waiting for approval, approved and picked up, soonest pickup first). Deleted bookings don't show at all.
+- **My history** is the customer's own report: totals (rentals, days rented, total for rentals, cancelled or not approved), filters (All time, This year, Last year, and by status), a table of every booking with a total row (tap a row for the full booking with pickup and return photos), and **Download Excel** with a Summary sheet and a My bookings sheet.
 - Log in to see **My bookings** with each booking's progress and assigned driver, read the office's comments, and chat in **Messages**. They can send photos with the camera button. Under each message they sent there is **Edit** (the message then shows "Edited") and **Unsend** (asks first, then removes it for both sides).
 - Edit their own details in **My details**, including uploading a new driver's license photo.
 - Cancel up to 2 days before pickup. The admin can change the number of days.

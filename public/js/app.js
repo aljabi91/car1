@@ -133,7 +133,7 @@ function endSession(){S.session=null;try{sessionStorage.removeItem('cr-session')
   if(S.server){try{localStorage.removeItem('cr-token')}catch(e){}S.uid=null;S.editor=false;S.assets=null;S.db.ready(null).catch(()=>{})}}
 
 /* ---------- routing ---------- */
-const CUST=[['fleet','Cars'],['my-bookings','My bookings'],['messages','Messages'],['my-details','My details']];
+const CUST=[['fleet','Cars'],['my-bookings','My bookings'],['my-history','My history'],['messages','Messages'],['my-details','My details']];
 const ADM=[['bookings','Rentals'],['customers','Customers'],['messages','Messages'],['cars','Fleet'],['drivers','Drivers'],['photos','Recent activity'],['reports','Reports'],['settings','Settings'],['fleet','Customer view']];
 const ACT_VIEWS=['fleet','my-bookings','my-details'];
 const GUEST=[['fleet','Cars'],['login','Log in']];
@@ -259,11 +259,7 @@ $('#meetForm').addEventListener('submit',async e=>{e.preventDefault();const text
   if(text.length<3){$('#meetErr').textContent='Enter the place or address.';$('#meetText').focus();return}
   if(link&&!GMAP_RE.test(link)){$('#meetErr').textContent='The link must be a Google Maps link, or leave it empty.';$('#meetLink').focus();return}
   const b=$('#meetSave');b.disabled=true;try{await setMeet(S.meetId,{text,link,at:Date.now()});$('#dMeet').close();renderMine();toast('Pickup point saved. The office will confirm.')}catch(x){$('#meetErr').textContent='Not saved. '+(x?.message||'Try again.')}finally{b.disabled=false}});
-function renderMine(){
-  $('#cancelBanner').innerHTML=policyHtml();
-  const el=$('#mineList');const list=[...myItems()].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  if(!list.length){el.innerHTML=`<div class="empty"><b>No bookings yet</b><a class="btn go" href="#fleet">Choose a car</a></div>`;return}
-  el.innerHTML=list.map(b=>{const c=carById(b.carId);const canCancel=canCancelNow(b);const open=['pending','approved'].includes(b.status);const i=ORDER.indexOf(b.status);
+function mineCard(b){const c=carById(b.carId);const canCancel=canCancelNow(b);const open=['pending','approved'].includes(b.status);const i=ORDER.indexOf(b.status);
     return `<article class="bk"><div class="ph">${carPic(c||{name:b.carName})}</div><div class="info">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><h3>${esc(b.carName||carTitle(c))}</h3><span class="pill s-${esc(b.status)}">${esc(ST[b.status]||b.status)}</span></div>
       <div>${esc(fmt(b.start))} to ${esc(fmt(b.end))}</div>
@@ -274,7 +270,46 @@ function renderMine(){
       ${(b.changes||[]).length?`<p class="okmsg" style="margin-top:6px;font-weight:500"><b>Changed by the office on ${esc(tAt(b.changes.at(-1).at))}:</b> ${esc(b.changes.at(-1).what)}</p>`:''}
       ${b.adminNote?`<p class="note" style="margin-top:6px"><b>Comment from the office:</b> ${esc(b.adminNote)}</p>`:''}
       ${['pickup','ret'].filter(sd=>hasHand(b,sd)).map(sd=>{const h=b.handover[sd];return`<div class="handc"><div><b>${HSIDE[sd][2]}</b>${h.updatedAt?` <span class="small">· ${esc(tAt(h.updatedAt))}</span>`:''}</div>${(h.files||[]).length?`<div class="pfgrid sm">${pfThumbs(S.uid,b,sd,false)}</div>`:''}${h.comment?`<p class="small" style="margin:0;color:var(--ink)"><b>Office comments:</b> ${esc(h.comment)}</p>`:''}</div>`}).join('')}
-    </div><div class="acts"><button class="btn sm" data-askbk="${esc(b.ref)}">Ask about this booking</button>${canCancel?`<button class="btn sm danger" data-cancel="${esc(b.id)}">Cancel booking</button>`:''}</div>${open?`<p class="small" style="grid-column:1/-1;margin:0">${canCancel?`You can cancel until ${esc(fmt(toLocal(cancelBy(b))))}.`:`The ${esc(cdTxt())} cancellation period has passed. To change or cancel, message the office.`}</p>`:''}</article>`}).join('');
+    </div><div class="acts"><button class="btn sm" data-askbk="${esc(b.ref)}">Ask about this booking</button>${canCancel?`<button class="btn sm danger" data-cancel="${esc(b.id)}">Cancel booking</button>`:''}</div>${open?`<p class="small" style="grid-column:1/-1;margin:0">${canCancel?`You can cancel until ${esc(fmt(toLocal(cancelBy(b))))}.`:`The ${esc(cdTxt())} cancellation period has passed. To change or cancel, message the office.`}</p>`:''}</article>`}
+/* customer's own history report */
+const HST={pending:'Waiting',approved:'Approved',active:'Picked up',completed:'Returned',cancelled:'Cancelled',rejected:'Not approved'};
+function histRows(){const per=S.hiPer||'all',st=$('#hiSt').value,y=new Date().getFullYear();
+  return[...myItems()].filter(b=>{const by=+String(b.start).slice(0,4);if(per==='year'&&by!==y)return false;if(per==='last'&&by!==y-1)return false;
+    if(st==='current')return['pending','approved','active'].includes(b.status);if(st!=='all')return b.status===st;return true}).sort((a,b)=>String(b.start).localeCompare(String(a.start)))}
+function histSum(rows){const done=rows.filter(b=>['approved','active','completed'].includes(b.status));
+  return{n:done.length,days:done.reduce((a,b)=>a+(+b.days||0),0),spent:done.reduce((a,b)=>a+(+b.total||0),0),lost:rows.filter(b=>['cancelled','rejected'].includes(b.status)).length}}
+function renderHistory(){if(S.session?.role!=='customer'){$('#hiTable').innerHTML='<div class="empty"><b>Log in to see your history</b><a class="btn go" href="#login">Log in</a></div>';$('#hiStats').innerHTML='';return}
+  document.querySelectorAll('[data-hper]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.hper===(S.hiPer||'all'))));
+  const rows=histRows(),m=histSum(rows);
+  $('#hiStats').innerHTML=`<div class="stat"><b>${m.n}</b><span>${m.n===1?'rental':'rentals'}</span></div><div class="stat"><b>${m.days}</b><span>days rented</span></div><div class="stat"><b>${esc(peso(m.spent))}</b><span>total for these rentals</span></div><div class="stat"><b>${m.lost}</b><span>cancelled or not approved</span></div>`;
+  $('#hiXlsx').disabled=!rows.length;$('#hiXlsx').textContent=`Download Excel (${rows.length})`;
+  $('#hiTable').innerHTML=rows.length?`<div class="scroll"><table class="stack rtab"><thead><tr><th>Ref</th><th>Car</th><th>Pickup</th><th>Return</th><th class="num">Days</th><th class="num">Total</th><th>Status</th></tr></thead><tbody>${rows.map(b=>`<tr class="click" data-hist="${esc(b.id)}" tabindex="0" aria-label="Open booking ${esc(b.ref)}"><td data-l="Ref"><b>${esc(b.ref)}</b></td><td data-l="Car">${esc(b.carName)}</td><td data-l="Pickup">${esc(fmt(b.start))}</td><td data-l="Return">${esc(fmt(b.end))}</td><td data-l="Days" class="num">${esc(b.days)}</td><td data-l="Total" class="num">${esc(peso(b.total))}</td><td data-l="Status"><span class="pill s-${esc(b.status)}">${esc(HST[b.status]||b.status)}</span></td></tr>`).join('')}</tbody><tfoot><tr><td colspan="4">Total for rentals (not counting cancelled or not approved)</td><td class="num">${m.days}</td><td class="num">${esc(peso(m.spent))}</td><td></td></tr></tfoot></table></div><p class="small">Tap a booking to see its details, pickup and return photos.</p>`:'<div class="empty"><b>No bookings for these filters</b></div>'}
+function openHist(id){const b=myItems().find(x=>x.id===id);if(!b)return;$('#hiT').textContent='Booking '+b.ref;$('#hiBody').innerHTML=mineCard(b);fillPfImgs($('#hiBody'));$('#dHist').showModal()}
+$('#dHist').addEventListener('click',e=>{if(e.target.closest('[data-askbk],[data-meet],[data-cancel],[data-meetx]'))$('#dHist').close()});
+$('#hiPer').addEventListener('click',e=>{const q=e.target.closest('[data-hper]');if(q){S.hiPer=q.dataset.hper;renderHistory()}});
+$('#hiSt').addEventListener('change',renderHistory);
+$('#hiTable').addEventListener('click',e=>{const r=e.target.closest('[data-hist]');if(r)openHist(r.dataset.hist)});
+$('#hiTable').addEventListener('keydown',e=>{const r=e.target.closest('[data-hist]');if(r&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openHist(r.dataset.hist)}});
+$('#hiXlsx').addEventListener('click',async()=>{const rows=histRows();if(!rows.length)return;$('#hiErr').textContent='';const m=histSum(rows);const st=SET();
+  const head=['Reference','Date booked','Car','Plate','Pickup','Return','Days','Price per day','Extras','How you get the car','Delivery fee','Total','Deposit','Status','Driver','Comment from office'];
+  const t=x=>x?fmt(x):'';
+  const list=[head,...rows.map(b=>[b.ref,b.createdAt?new Date(b.createdAt).toLocaleString('en-PH'):'',b.carName,b.plate||'',t(b.start),t(b.end),+b.days||0,{money:+b.rate||0},(b.extras||[]).join(', '),b.meetAt?.text?'At '+b.meetAt.text:b.pickup==='delivery'?'Delivered':'Office pickup',{money:+b.delivery||0},{money:+b.total||0},{money:+b.deposit||0},HST[b.status]||b.status,b.driverName||'',b.adminNote||'']),
+    [{text:'TOTAL (rentals)',bold:true},'','','','','',{num:m.days,bold:true},'','','','',{money:m.spent,bold:true},'','','','']];
+  const sel=$('#hiSt').selectedOptions[0]?.textContent||'';
+  const sum=[['Item','Value'],['Customer',S.session.name],['From',st.siteName],['Downloaded',new Date().toLocaleString('en-PH')],['Period',{all:'All time',year:'This year',last:'Last year'}[S.hiPer||'all']],['Bookings shown',sel],['',''],['Rentals',m.n],['Days rented',m.days],[{text:'Total for rentals',bold:true},{money:m.spent,bold:true}],['Cancelled or not approved',m.lost]];
+  try{await saveFile(makeXlsx([{name:'Summary',rows:sum,widths:[28,40],money:[]},{name:'My bookings',rows:list,widths:[12,20,22,11,22,22,7,13,26,30,12,12,12,13,18,36],money:[7,10,11,12]}]),`my-rental-history-${new Date().toISOString().slice(0,10)}.xlsx`)}
+  catch(x){$('#hiErr').textContent='The file was not downloaded. '+(x?.message||'Try again.')}});
+function renderMine(){
+  $('#cancelBanner').innerHTML=policyHtml();
+  /* Current: waiting, approved and picked up (soonest pickup first). History: returned, cancelled, not approved (newest first). */
+  const all=[...myItems()],NOW=['pending','approved','active'];
+  const cur=all.filter(b=>NOW.includes(b.status)).sort((a,b)=>String(a.start).localeCompare(String(b.start)));
+  const past=all.filter(b=>!NOW.includes(b.status)).sort((a,b)=>(b.updatedAt||b.createdAt||0)-(a.updatedAt||a.createdAt||0));
+  $('#mineHistLink').innerHTML=past.length?`Returned and cancelled bookings, with your totals, are in <a href="#my-history">My history</a> (${past.length}).`:'';
+  const el=$('#mineList');const list=cur;
+  if(!all.length){el.innerHTML=`<div class="empty"><b>No bookings yet</b><a class="btn go" href="#fleet">Choose a car</a></div>`;return}
+  if(!list.length){el.innerHTML=`<div class="empty"><b>No current bookings</b><span>Your returned and cancelled bookings are in <a href="#my-history">My history</a>.</span><a class="btn go" href="#fleet">Choose a car</a></div>`;return}
+  el.innerHTML=list.map(mineCard).join('');
   fillPfImgs(el);
 }
 
@@ -486,6 +521,7 @@ function render(){
   if(v==='fleet'){ticket();renderFleet()}
   if(ACT_VIEWS.includes(v))renderStrip();
   if(v==='my-bookings')renderMine();
+  if(v==='my-history')renderHistory();
   if(v==='bookings')renderAdmin();
   if(v==='cars')renderCars();
   if(v==='photos')renderPhotos();
@@ -937,11 +973,11 @@ function notifList(){const out=[];const cut=Date.now()-45*864e5;
     if(last&&last.at>cut)out.push({id:'r:'+last.at,ic:'chat',t:last.at,auto:!th.unreadC,html:`<b>Message from the office:</b> ${esc(cut90(msgPreview(last)))}`,go:()=>{S.msgScrolled=false;location.hash='#messages';route()}});
     const W={approved:'is approved',rejected:'was not approved',active:'is picked up. Enjoy your trip!',completed:'is returned. Thank you for renting with us!',cancelled:'is cancelled'};
     myItems().forEach(b=>{const t=b.updatedAt||0;if(t<cut)return;const ch=(b.changes||[]).at(-1);
-      if(b.status!=='pending'&&!(b.status==='cancelled'&&b.cancelledBy==='customer'))out.push({id:`u:${b.id}:${b.status}`,ic:'car',t:ch&&ch.at>t-2000&&b.status==='approved'?t-1:t,html:`<b>Booking ${esc(b.ref)}</b> ${esc(W[b.status]||'was updated')}${b.status==='approved'&&b.driverName?` · Driver: ${esc(b.driverName)}`:''}`,go:()=>{location.hash='#my-bookings';route()}});
-      if(ch&&ch.at>cut)out.push({id:`h:${b.id}:${(b.changes||[]).length}`,ic:'car',t:ch.at,html:`<b>Booking ${esc(b.ref)} was changed:</b> ${esc(ch.what.length>100?ch.what.slice(0,100)+'…':ch.what)}`,go:()=>{location.hash='#my-bookings';route()}})});
+      if(b.status!=='pending'&&!(b.status==='cancelled'&&b.cancelledBy==='customer'))out.push({id:`u:${b.id}:${b.status}`,ic:'car',t:ch&&ch.at>t-2000&&b.status==='approved'?t-1:t,html:`<b>Booking ${esc(b.ref)}</b> ${esc(W[b.status]||'was updated')}${b.status==='approved'&&b.driverName?` · Driver: ${esc(b.driverName)}`:''}`,go:()=>{location.hash=['pending','approved','active'].includes(b.status)?'#my-bookings':'#my-history';route()}});
+      if(ch&&ch.at>cut)out.push({id:`h:${b.id}:${(b.changes||[]).length}`,ic:'car',t:ch.at,html:`<b>Booking ${esc(b.ref)} was changed:</b> ${esc(ch.what.length>100?ch.what.slice(0,100)+'…':ch.what)}`,go:()=>{location.hash=['pending','approved','active'].includes(b.status)?'#my-bookings':'#my-history';route()}})});
   }
   if(S.session?.role==='customer')myItems().forEach(b=>['pickup','ret'].forEach(sd=>{const h=b.handover?.[sd];if(!hasHand(b,sd)||!(h.updatedAt>cut))return;
-    out.push({id:`p:${b.id}:${sd}:${(h.files||[]).length}:${(h.comment||'').length}`,ic:'doc',t:h.updatedAt,html:`<b>Booking ${esc(b.ref)}:</b> the office added ${sd==='pickup'?'pickup':'return'} photos and documents${h.comment?' with comments':''}`,go:()=>{location.hash='#my-bookings';route()}})}));
+    out.push({id:`p:${b.id}:${sd}:${(h.files||[]).length}:${(h.comment||'').length}`,ic:'doc',t:h.updatedAt,html:`<b>Booking ${esc(b.ref)}:</b> the office added ${sd==='pickup'?'pickup':'return'} photos and documents${h.comment?' with comments':''}`,go:()=>{location.hash=['pending','approved','active'].includes(b.status)?'#my-bookings':'#my-history';route()}})}));
   const rm=readMap();out.forEach(n=>n.read=!!rm[n.id]||!!n.auto);return out.sort((a,b)=>b.t-a.t).slice(0,40)}
 async function markRead(ids){if(!ids.length)return;
   if(S.admin){const cur={...(S.notifRead||{})};ids.forEach(i=>cur[i]=Date.now());const keep=Object.entries(cur).sort((a,b)=>b[1]-a[1]).slice(0,400);S.notifRead=Object.fromEntries(keep);renderBell();
