@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
-const { createApi, canRead, viewOf, SAMPLE_CARS } = require('./lib/core');
+const { createApi, canRead, SAMPLE_CARS } = require('./lib/core');
 
 const PORT = +process.env.PORT || 3000;
 const PUB = path.join(__dirname, 'public');
@@ -48,16 +48,21 @@ const photos = {
 
 /* ---------- live updates ---------- */
 const clients = new Set();
-function onChange(p, doc) {
-  const msg = 'data: ' + JSON.stringify({ path: p, doc }) + '\n\n';
-  for (const c of clients) if (canRead(c.a, p)) c.res.write(doc && p.startsWith('drivers/') ? 'data: ' + JSON.stringify({ path: p, doc: viewOf(c.a, p, doc) }) + '\n\n' : msg);
+async function onChange(p, doc) {
+  for (const c of clients) {
+    if (!canRead(c.a, p)) continue;
+    const [path2, doc2] = await api.publicView(c.a, p, doc);
+    c.res.write('data: ' + JSON.stringify({ path: path2, doc: doc2 }) + '\n\n');
+  }
 }
 setInterval(() => { for (const c of clients) c.res.write(': ping\n\n'); }, 25000);
 
 const api = createApi({ store, photos, onChange, live: true });
 
 /* ---------- http ---------- */
-const SAFE = { 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'referrer-policy': 'same-origin' };
+/* Same browser rules as vercel.json: only this site's own scripts may run */
+const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.blob.vercel-storage.com; connect-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+const SAFE = { 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'referrer-policy': 'same-origin', 'content-security-policy': CSP };
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
 function readBody(req, max) {
   return new Promise((resolve, reject) => {

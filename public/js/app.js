@@ -92,6 +92,7 @@ async function shrink(file){
 }
 
 /* ---------- availability ---------- */
+$('#searchForm').addEventListener('submit',e=>e.preventDefault());
 const allBlocks=()=>S.blocks.flatMap(d=>(d.items||[]).map(b=>({...b,owner:d.id})));
 function clashes(carId,start,end,ignore){
   if(!start||!end)return[];
