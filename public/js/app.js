@@ -1051,7 +1051,9 @@ const shownRevs=()=>S.reviews.filter(r=>!r.hidden&&+r.stars>0).sort((a,b)=>(b.cr
 function revStats(carId){const l=shownRevs().filter(r=>!carId||r.carId===carId);return{n:l.length,avg:l.length?Math.round(l.reduce((a,r)=>a+(+r.stars),0)/l.length*10)/10:0,list:l}}
 const revMonth=w=>/^\d{4}-\d{2}$/.test(w||'')?new Date(w+'-15T12:00').toLocaleDateString('en-PH',{month:'short',year:'numeric'}):'';
 const revCard=r=>`<article class="post revcard">${starsHtml(r.stars)}${r.text?`<p>${esc(r.text)}</p>`:''}<div><div class="revwho">${r.anon||!r.name?'Verified renter':esc(r.name)}</div><div class="revmeta">${esc([r.carName,revMonth(r.when)].filter(Boolean).join(' · '))}</div></div>${r.reply?`<div class="revreply"><b>Reply from the office:</b> ${esc(r.reply)}</div>`:''}</article>`;
-function renderRevBand(){const box=$('#revBand');const m=revStats();box.classList.toggle('hide',!(m.n&&S.view==='fleet'));if(!m.n)return;
+function renderRevBand(){const box=$('#revBand');const m=revStats();box.classList.toggle('hide',S.view!=='fleet');
+  if(!m.n){$('#revAvg').innerHTML='<span class="small">No reviews yet</span>';$('#revStrip').innerHTML='<div class="empty" style="flex:1 0 100%;padding:28px"><b>Reviews from our renters will appear here</b><span>After their trip, renters can rate the car and the service.</span></div>';$('#rPrev').classList.add('hide');$('#rNext').classList.add('hide');return}
+  $('#rPrev').classList.remove('hide');$('#rNext').classList.remove('hide');
   $('#revAvg').innerHTML=`<b>${m.avg.toFixed(1)}</b>${starsHtml(m.avg)}<span class="small">from ${m.n} ${m.n===1?'renter':'renters'}</span>`;
   $('#revStrip').innerHTML=m.list.slice(0,30).map(revCard).join('');
   const st=$('#revStrip');const upd=()=>{$('#rPrev').disabled=st.scrollLeft<=4;$('#rNext').disabled=st.scrollLeft+st.clientWidth>=st.scrollWidth-4};upd();st.onscroll=upd}
