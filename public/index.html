@@ -6,7 +6,7 @@
 <title>Car Rental System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=202611272316">
+<link rel="stylesheet" href="css/style.css?v=202611272335">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -139,6 +139,7 @@
     <div class="wrap">
       <div class="head"><div><h1>Rentals</h1><p class="sub">Everyone who has booked, with their details. Open a booking to mark pickup or return.</p></div><button class="btn" id="chgAdmin">Change admin login</button></div>
       <p class="note hide" id="defPw" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span><b>Change the admin password.</b> You're still using the default login (admin1 / admin123), which anyone could guess.</span><button type="button" class="btn sm go" data-defpw>Change it now</button></p>
+      <div id="fullNote"></div>
       <div class="stats" id="stats"></div>
       <div class="pend hide" id="pendBox"><h2 id="pendT">Waiting for your answer</h2><div id="pendList"></div></div>
       <div class="cols">
@@ -202,7 +203,7 @@
   <section id="v-customers" class="view hide">
     <div class="wrap">
       <div class="head"><div><h1>Customers</h1><p class="sub">Everyone who has rented or asked to rent, with their contact details and totals.</p></div></div>
-      <div class="tools"><input id="custQ" placeholder="Search name, mobile, email, username or customer ID" aria-label="Search customers"></div>
+      <div class="tools"><input id="custQ" placeholder="Search name, mobile, email or customer ID" aria-label="Search customers"></div>
       <div class="scroll"><table class="stack" id="custTable"><thead><tr><th>Customer</th><th>Mobile</th><th>Address</th><th class="num">Rentals</th><th class="num">Total spent</th><th>Last rental</th><th></th></tr></thead><tbody></tbody></table></div>
       <div class="empty hide" id="custEmpty"><b>No customers yet</b><span>People who book a car will show up here.</span></div>
       <section id="trashSec" class="hide" style="margin-top:34px" aria-labelledby="trT">
@@ -337,6 +338,7 @@
   <section id="v-cars" class="view hide">
     <div class="wrap">
       <div class="head"><div><h1>Fleet</h1><p class="sub">Change a price or photo right here, or open a car to edit all its details.</p></div><button class="btn go" id="addCar">Add a car</button></div>
+      <div id="fullBox"></div>
       <div id="carList"></div>
     </div>
   </section>
@@ -638,6 +640,16 @@
   <div class="dh"><h2 id="rvsT">Reviews</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
   <div class="db" id="rvsBody"></div>
 </dialog>
+<dialog id="dLogin" aria-labelledby="lgT">
+  <form id="lgForm" novalidate>
+    <div class="dh"><h2 id="lgT">Login details</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+    <div class="db">
+      <div id="lgAsk" style="display:grid;gap:10px"><p style="margin:0" id="lgWho"></p><div><label for="lgPass">Your admin password</label><div class="pw"><input id="lgPass" type="password" autocomplete="current-password"><button type="button" class="btn sm ghost" id="lgShowPw">Show</button></div><p class="hint">Needed to see a customer's login. Nothing is shown until it's checked.</p></div><p class="err" id="lgErr" role="alert"></p></div>
+      <div id="lgOut" class="hide" style="display:grid;gap:10px"></div>
+    </div>
+    <div class="df"><button type="button" class="btn" data-close>Close</button><button class="btn go" id="lgGo">Show login</button></div>
+  </form>
+</dialog>
 <dialog id="dHist" aria-labelledby="hiT" style="width:min(900px,calc(100% - 20px))">
   <div class="dh"><h2 id="hiT">Booking</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
   <div class="db mine" id="hiBody"></div>
@@ -662,6 +674,6 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<script src="js/app.js?v=202611272316"></script>
+<script src="js/app.js?v=202611272335"></script>
 </body>
 </html>
