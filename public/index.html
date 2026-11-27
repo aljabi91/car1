@@ -6,7 +6,7 @@
 <title>Car Rental System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=202611262340">
+<link rel="stylesheet" href="css/style.css?v=202611271004">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -45,6 +45,7 @@
         <path d="M909 268 L913 268 L938 300 L930 300Z M944 318 L954 318 L990 366 L974 366Z M1006 392 L1022 392 L1042 420 L1020 420Z" fill="#ff7a1a"/>
         <path d="M880 262 L620 420 M940 262 L1200 420" stroke="#ffffff" stroke-opacity=".35" stroke-width="2"/>
       </svg>
+      <div class="hero-photo hide" id="heroPhoto"><img id="heroImg" alt=""></div>
       <div class="wrap hero-in">
         <div class="hero-copy">
           <p class="kicker" id="heroKicker">Car rental</p>
@@ -230,6 +231,11 @@
             <h2>Website name and logo</h2>
             <div><label for="setName">Website name</label><input id="setName" maxlength="40" placeholder="Car Rental"></div>
             <div><label for="setLogoFile">Logo</label><div class="licbox"><div class="logoprev" id="setLogoPrev"></div><div style="display:grid;gap:6px"><label class="btn sm" for="setLogoFile">Upload logo</label><input type="file" id="setLogoFile" accept="image/*" class="vh"><button type="button" class="btn sm danger" id="setLogoDel">Use the car icon</button></div></div><p class="hint">A PNG with a clear background looks neatest. It's shown on the blue bar at the top.</p></div>
+            <div><label for="setHeroFile">Top banner background</label>
+              <div class="heroprev" id="setHeroPrev"></div>
+              <div class="acts" style="justify-content:flex-start;margin-top:8px"><label class="btn sm" for="setHeroFile" id="setHeroL">Upload photo</label><input type="file" id="setHeroFile" accept="image/*" class="vh"><button type="button" class="btn sm danger hide" id="setHeroDel">Use the road drawing</button></div>
+              <div id="setShadeRow" class="hide" style="margin-top:8px"><label for="setShade">Darken the photo so the heading stays readable</label><input type="range" id="setShade" min="20" max="90" step="5"></div>
+              <p class="hint">The large picture behind "Rent a car for your next trip" on the Cars page. A wide photo works best; keep the main subject in the middle, because phones show the middle part.</p></div>
           </div>
           <div class="card" style="display:grid;gap:12px">
             <h2>Fees and rules</h2>
@@ -292,7 +298,7 @@
   <!-- ADMIN: PHOTOS -->
   <section id="v-photos" class="view hide">
     <div class="wrap">
-      <div class="head"><div><h1>Recent activity</h1><p class="sub">Post photos of renters and trips. They show in the Recent activity carousel on every customer's dashboard, newest first.</p></div></div>
+      <div class="head"><div><h1>Recent activity</h1><p class="sub">Post photos of renters and trips. They show in the Recent activity carousel on the Cars page and every customer's dashboard.</p></div></div>
       <div class="drop" id="dropZone">
         <div class="two">
           <div><label for="pFiles">Photos <span class="req">*</span></label><input type="file" id="pFiles" accept="image/*" multiple><p class="hint">Choose files or drop them on this box.</p></div>
@@ -304,6 +310,7 @@
         </div>
         <div class="acts" style="justify-content:flex-start"><button class="btn go" id="pUp">Post</button><span class="small" id="pMsg"></span></div>
       </div>
+      <div class="psort"><b>Order customers see:</b><div class="seg" role="group" aria-label="Order of posts"><button type="button" class="chip" data-psort="newest" aria-pressed="true">Newest first</button><button type="button" class="chip" data-psort="oldest" aria-pressed="false">Oldest first</button></div><span class="small" id="pSortHint"></span></div>
       <div class="pgrid" id="pGrid"></div>
     </div>
   </section>
@@ -548,6 +555,6 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<script src="js/app.js?v=202611262340"></script>
+<script src="js/app.js?v=202611271004"></script>
 </body>
 </html>

@@ -418,6 +418,15 @@ nav a:hover{border-radius:10px}
 /* hero */
 .hero{position:relative;overflow:hidden;background:var(--band);padding:56px 0 110px;isolation:isolate}
 .hero .scene{position:absolute;inset:0;width:100%;height:100%;z-index:-1}
+.hero-photo{position:absolute;inset:0;z-index:-1}
+.hero-photo img{width:100%;height:100%;object-fit:cover;object-position:center;display:block}
+.hero-photo::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,22,48,var(--shade,.75)) 0%,rgba(8,22,48,calc(var(--shade,.75) * .75)) 50%,rgba(8,22,48,calc(var(--shade,.75) * .35)) 100%)}
+@media(max-width:760px){.hero-photo::after{background:rgba(8,22,48,var(--shade,.75))}}
+.psort{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;margin:22px 0 14px}
+.heroprev{position:relative;width:100%;max-width:360px;aspect-ratio:3/1;border-radius:12px;overflow:hidden;background:var(--band);border:1px solid var(--line)}
+.heroprev img,.heroprev svg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.heroprev .shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,22,48,var(--shade,.75)),rgba(8,22,48,calc(var(--shade,.75) * .35)))}
+.heroprev b{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#fff;font-size:15px;line-height:1.1;max-width:60%}
 .hero-in{display:block}
 .hero-copy{max-width:640px}
 .kicker{display:inline-block;color:#ffb066;font-weight:700;font-size:15px;margin-bottom:12px;padding:4px 12px;border:1px solid rgba(255,176,102,.45);border-radius:99px}

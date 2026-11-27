@@ -29,7 +29,7 @@ const DEF_TERMS=`# Who can rent
 
 # Cancellation
 - You can cancel online up to the number of days before pickup shown on your booking. After that, message the office.`;
-const SET=()=>{const x=S.settings||{};return{contact:x.contact&&typeof x.contact==='object'?x.contact:{},siteName:String(x.siteName||'').trim()||'Car Rental',logoId:x.logoId||'',extras:Array.isArray(x.extras)?x.extras:DEF_SET.extras,delivery:Number.isFinite(+x.delivery)&&x.delivery!==undefined?+x.delivery:DEF_SET.delivery,cancelDays:Number.isFinite(+x.cancelDays)&&x.cancelDays!==undefined?+x.cancelDays:DEF_SET.cancelDays,cancelText:typeof x.cancelText==='string'?x.cancelText.trim():'',terms:typeof x.terms==='string'?x.terms:DEF_TERMS,termsAt:+x.termsAt||0}};
+const SET=()=>{const x=S.settings||{};return{contact:x.contact&&typeof x.contact==='object'?x.contact:{},siteName:String(x.siteName||'').trim()||'Car Rental',logoId:x.logoId||'',heroId:x.heroId||'',heroShade:Number.isFinite(+x.heroShade)&&x.heroShade!==undefined?+x.heroShade:60,extras:Array.isArray(x.extras)?x.extras:DEF_SET.extras,delivery:Number.isFinite(+x.delivery)&&x.delivery!==undefined?+x.delivery:DEF_SET.delivery,cancelDays:Number.isFinite(+x.cancelDays)&&x.cancelDays!==undefined?+x.cancelDays:DEF_SET.cancelDays,cancelText:typeof x.cancelText==='string'?x.cancelText.trim():'',terms:typeof x.terms==='string'?x.terms:DEF_TERMS,termsAt:+x.termsAt||0}};
 const hasTerms=()=>!!SET().terms.trim();
 const EX=()=>SET().extras;
 const cdTxt=()=>plural(SET().cancelDays,'day');
@@ -223,8 +223,15 @@ function updDots(){const st=$('#strip');const n=st.querySelectorAll('.post').len
   const w=st.clientWidth||1;const cur=Math.round(st.scrollLeft/w);
   $('#stripDots').innerHTML=pages>1?Array.from({length:pages},(_,i)=>`<i class="${i===cur?'on':''}"></i>`).join(''):'';
   $('#sPrev').disabled=st.scrollLeft<=4;$('#sNext').disabled=st.scrollLeft+st.clientWidth>=st.scrollWidth-4}
+/* newest first by the post's date (or the day it was posted when it has no date) */
+const postDay=p=>/^\d{4}-\d{2}-\d{2}/.test(p.date||'')?String(p.date).slice(0,10):(p.createdAt?toLocal(new Date(p.createdAt)).slice(0,10):'');
+function postsByDate(){return[...S.gallery].sort((a,b)=>postDay(b).localeCompare(postDay(a))||(b.createdAt||0)-(a.createdAt||0))}
+/* the order customers see: by each post's date, newest or oldest first, chosen by the admin with one switch */
+function postsOrdered(){const g=postsByDate();return S.settings?.postSort==='oldest'?g.reverse():g}
+async function savePostSort(sort){const data={...(S.settings||{}),postSort:sort,updatedAt:Date.now()};
+  await serial('set',()=>S.db.doc('settings/main').set(data));S.settings=data}
 function renderStrip(){
-  const s=$('#strip');const g=[...S.gallery].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const s=$('#strip');const g=postsOrdered();
   s.innerHTML=g.length?g.map(p=>`<figure class="post"><button type="button" class="pic" data-post="${esc(p.id)}" aria-label="See ${esc(p.caption||'this post')} larger"><img src="${esc(imgUrl(p.imageId))}" alt="${esc(p.caption||'Recent activity photo')}" loading="lazy"></button>${p.caption||p.date||p.desc?`<figcaption>${p.caption?`<b>${esc(p.caption)}</b>`:''}${p.date?`<span class="pdate"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${esc(fmtLong(p.date))}</span>`:''}${p.desc?`<span class="pdesc">${esc(p.desc)}</span>`:''}</figcaption>`:''}</figure>`).join(''):`<div class="empty" style="flex:1">${S.admin?'<b>No posts yet</b><a class="btn go" href="#photos">Post a photo</a>':'Photos of our renters and trips will appear here.'}</div>`;
   updDots();
 }
@@ -286,8 +293,10 @@ function renderCars(){
   el.innerHTML=S.cars.length?[...S.cars].sort((a,b)=>carTitle(a).localeCompare(carTitle(b))).map(c=>`<div class="fleetrow"><div class="ph">${carPic(c)}</div><div class="info"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><h3>${esc(carTitle(c))}</h3><span class="pill s-${esc(c.status)}">${c.status==='available'?'Available':c.status==='hidden'?'Hidden':'Maintenance'}</span></div><div class="small">${esc(c.year||'')} ${esc(c.type||'')} · ${esc(c.seats||'?')} seats · ${esc(c.trans||'')} · ${esc(c.fuel||'')}</div>${c.plate?`<div><span class="plate">${esc(c.plate)}</span> <span class="small">${plural(carImgs(c).length,'photo')}</span></div>`:`<div class="small">${plural(carImgs(c).length,'photo')}</div>`}</div><div class="acts"><span class="rateedit"><label for="r-${esc(c.id)}" class="small">₱ per day</label><input id="r-${esc(c.id)}" type="number" min="0" step="50" value="${esc(c.rate)}" data-rate="${esc(c.id)}"><button class="btn sm" data-saverate="${esc(c.id)}">Save price</button></span><label class="btn sm${S.assets?'':' hide'}" style="margin:0">Add photo<input type="file" accept="image/*" data-photo="${esc(c.id)}" hidden></label><button class="btn sm go" data-edit="${esc(c.id)}">Edit all details</button><button class="btn sm danger" data-cdel="${esc(c.id)}">Delete</button></div></div>`).join(''):'<div class="empty"><b>No cars yet</b><span>Add your first car to start taking bookings.</span></div>';
 }
 function renderPhotos(){
-  const g=[...S.gallery].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  $('#pGrid').innerHTML=g.length?g.map(p=>`<figure><img src="${esc(imgUrl(p.imageId))}" alt="${esc(p.caption||'Recent activity photo')}" loading="lazy"><figcaption style="display:grid;gap:6px"><span><b>${esc(p.caption||'No caption')}</b><br><span class="small">${p.date?esc(fmtLong(p.date)):'No date shown'}</span>${p.desc?`<br><span class="small">${esc(p.desc.length>90?p.desc.slice(0,90)+'…':p.desc)}</span>`:''}</span><span class="acts" style="justify-content:flex-start"><button class="btn sm go" data-pedit="${esc(p.id)}">Edit</button><button class="btn sm danger" data-pdel="${esc(p.id)}">Delete</button></span></figcaption></figure>`).join(''):'<div class="empty" style="grid-column:1/-1"><b>No posts yet</b><span>Post photos of your renters and trips with a caption.</span></div>';
+  const g=postsOrdered();const old=S.settings?.postSort==='oldest';
+  document.querySelectorAll('[data-psort]').forEach(b=>b.setAttribute('aria-pressed',String((b.dataset.psort==='oldest')===old)));
+  $('#pSortHint').textContent=(old?'The earliest date comes first.':'The latest date comes first.')+' Sorted by the date on each post; a post without a date uses the day it was posted. Customers see the same order.';
+  $('#pGrid').innerHTML=g.length?g.map((p,i)=>`<figure><img src="${esc(imgUrl(p.imageId))}" alt="${esc(p.caption||'Recent activity photo')}" loading="lazy"><figcaption style="display:grid;gap:6px"><span><b>${esc(p.caption||'No caption')}</b><br><span class="small">${p.date?esc(fmtLong(p.date)):'No date shown'}</span>${p.desc?`<br><span class="small">${esc(p.desc.length>90?p.desc.slice(0,90)+'…':p.desc)}</span>`:''}</span><span class="acts" style="justify-content:flex-start"><button class="btn sm go" data-pedit="${esc(p.id)}">Edit</button><button class="btn sm danger" data-pdel="${esc(p.id)}">Delete</button></span></figcaption></figure>`).join(''):'<div class="empty" style="grid-column:1/-1"><b>No posts yet</b><span>Post photos of your renters and trips with a caption.</span></div>';
 }
 function renderLogin(){}
 
@@ -696,8 +705,12 @@ function renderSettings(){
   if(S.setDirty)return;const st=SET();
   S.setEx=st.extras.map(x=>({...x}));drawExRows();
   $('#setDel').value=st.delivery;$('#setCancel').value=st.cancelDays;$('#setCancelText').value=st.cancelText;$('#setMsg').textContent='';$('#setTerms').value=st.terms;$('#setTermsSample').classList.toggle('hide',typeof S.settings?.terms==='string');
-  $('#setName').value=st.siteName;{const c=st.contact||{};$('#setPhone').value=c.phone||'';$('#setEmail').value=c.email||'';$('#setAddr').value=c.addr||'';$('#setHours').value=c.hours||'';SOCIALS.forEach(([k,id])=>$('#'+id).value=c[k]||'');$('#setOtherL').value=c.otherLabel||''}S.setLogo=null;S.setLogoDrop=false;S.setLogoId=st.logoId;drawLogoPrev();
+  $('#setName').value=st.siteName;{const c=st.contact||{};$('#setPhone').value=c.phone||'';$('#setEmail').value=c.email||'';$('#setAddr').value=c.addr||'';$('#setHours').value=c.hours||'';SOCIALS.forEach(([k,id])=>$('#'+id).value=c[k]||'');$('#setOtherL').value=c.otherLabel||''}S.setLogo=null;S.setLogoDrop=false;S.setLogoId=st.logoId;drawLogoPrev();S.setHero=null;S.setHeroDrop=false;S.setHeroId=st.heroId;$('#setShade').value=st.heroShade;drawHeroPrev();
 }
+function drawHeroPrev(){const src=S.setHero?S.setHeroUrl:(!S.setHeroDrop&&S.setHeroId?imgUrl(S.setHeroId):'');const pv=$('#setHeroPrev');
+  pv.style.setProperty('--shade',(+$('#setShade').value||60)/100);
+  pv.innerHTML=src?`<img src="${esc(src)}" alt="Top banner photo preview"><span class="shade"></span><b>Rent a car for your next trip</b>`:document.querySelector('.hero .scene').outerHTML.replace('class="scene"','class="scene" style="position:absolute"')+'<b>Rent a car for your next trip</b>';
+  $('#setHeroDel').classList.toggle('hide',!src);$('#setShadeRow').classList.toggle('hide',!src);$('#setHeroL').textContent=src?'Change photo':'Upload photo'}
 function drawLogoPrev(){const src=S.setLogo?S.setLogoUrl:(!S.setLogoDrop&&S.setLogoId?imgUrl(S.setLogoId):'');$('#setLogoPrev').innerHTML=src?`<img src="${esc(src)}" alt="Logo preview">`:'<svg width="48" height="31" viewBox="0 0 34 22" style="color:#fff"><use href="#i-car"/></svg>';$('#setLogoDel').classList.toggle('hide',!src)}
 function drawExRows(){
   $('#exRows').innerHTML=S.setEx.length?S.setEx.map((x,i)=>`<div class="exrow"><input aria-label="Extra name" data-exl="${i}" value="${esc(x.label)}" placeholder="e.g. Car phone holder"><div class="rateedit"><span class="small">₱</span><input aria-label="Price per day" type="number" min="0" step="50" data-exp="${i}" value="${esc(x.perDay)}"><span class="small nw">a day</span></div><label class="check" style="margin:0"><input type="checkbox" data-exd="${i}" ${x.driver?'checked':''}>Includes a driver</label><button type="button" class="btn sm danger" data-exx="${i}">Remove</button></div>`).join(''):'<p class="small">No extras. Customers won\'t see any extras when booking.</p>';
@@ -726,14 +739,18 @@ $('#setSave').addEventListener('click',async()=>{
   if(contact.email&&!/^\S+@\S+\.\S+$/.test(contact.email)){msg.textContent='Check the email address in Contact details.';$('#setEmail').focus();return}
   for(const [k,id,l] of SOCIALS){if(contact[k]&&!/^https:\/\/\S+\.\S+/i.test(contact[k])){msg.textContent=`The ${l} link must start with https://`;$('#'+id).focus();return}}
   if(contact.other&&!contact.otherLabel){msg.textContent='Give the other link a name, such as "Viber community".';$('#setOtherL').focus();return}
-  const b=$('#setSave');b.disabled=true;const oldLogo=SET().logoId;
+  if(S.setHero&&!S.assets){msg.textContent='Only the admin can upload a banner photo.';return}
+  const b=$('#setSave');b.disabled=true;const oldLogo=SET().logoId,oldHero=SET().heroId;
   try{
     let logoId=S.setLogoDrop?'':oldLogo;
     if(S.setLogo){try{logoId=(await S.assets.upload(S.setLogo)).id}catch(x){msg.textContent='The logo was not uploaded: '+(x?.message||'try a smaller picture.');return}}
+    let heroId=S.setHeroDrop?'':oldHero;
+    if(S.setHero){try{heroId=(await S.assets.upload(S.setHero)).id}catch(x){msg.textContent='The banner photo was not uploaded: '+(x?.message||'try a smaller picture.');return}}
     const terms=$('#setTerms').value.replace(/\s+$/,'');const termsAt=terms!==SET().terms||!(S.settings?.termsAt)?Date.now():S.settings.termsAt;
-    const data={...(S.settings||{}),extras:ex,delivery:del,cancelDays:cd,siteName,logoId,contact,terms,termsAt,cancelText:$('#setCancelText').value.trim().slice(0,1500),updatedAt:Date.now()};
+    const data={...(S.settings||{}),extras:ex,delivery:del,cancelDays:cd,siteName,logoId,heroId,heroShade:Math.min(90,Math.max(20,+$('#setShade').value||60)),contact,terms,termsAt,cancelText:$('#setCancelText').value.trim().slice(0,1500),updatedAt:Date.now()};
     await serial('set',()=>S.db.doc('settings/main').set(data));
     if(oldLogo&&oldLogo!==logoId&&S.assets)S.assets.delete(oldLogo).catch(()=>{});
+    if(oldHero&&oldHero!==heroId&&S.assets)S.assets.delete(oldHero).catch(()=>{});
     S.settings=data;S.setDirty=false;renderSettings();route();toast('Settings saved. Everyone sees the changes now.')}
   catch(x){msg.textContent='Not saved. '+(x?.message||'Try again.')}finally{b.disabled=false}
 });
@@ -901,6 +918,8 @@ function renderFooter(){const st=SET();const c=st.contact||{};$('#footTermsLi').
   $('#footLogin').textContent=S.session?'My account':'Log in';$('#footLogin').href=S.session?(S.admin?'#bookings':'#my-bookings'):'#login'}
 function applyBrand(){
   const st=SET();$('#brandName').textContent=st.siteName;renderFooter();renderTrust();
+  const hsrc=st.heroId?imgUrl(st.heroId):'';if(S.heroSrc!==hsrc){S.heroSrc=hsrc;if(hsrc)$('#heroImg').src=hsrc;else $('#heroImg').removeAttribute('src')}
+  $('#heroPhoto').classList.toggle('hide',!hsrc);$('.hero .scene').classList.toggle('hide',!!hsrc);$('#heroPhoto').style.setProperty('--shade',st.heroShade/100);
   const src=st.logoId?imgUrl(st.logoId):'';
   if(S.brandSrc!==src){S.brandSrc=src;$('#brandLogo').innerHTML=src?`<img src="${esc(src)}" alt="">`:'<svg width="34" height="22" style="color:#fff"><use href="#i-car"/></svg>';
     let ic=document.querySelector('link[rel=icon]');if(src){if(!ic){ic=document.createElement('link');ic.rel='icon';document.head.appendChild(ic)}ic.href=src}else if(ic)ic.remove()}
@@ -913,6 +932,10 @@ $('#pLicFile').addEventListener('change',async e=>{const f=e.target.files[0];e.t
 $('#setLogoFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;$('#setMsg').textContent='';
   try{S.setLogo=await logoBlob(f);if(S.setLogoUrl)URL.revokeObjectURL(S.setLogoUrl);S.setLogoUrl=URL.createObjectURL(S.setLogo);S.setLogoDrop=false;S.setDirty=true;drawLogoPrev()}catch(x){$('#setMsg').textContent=x.message||'The logo could not be used.'}});
 $('#setLogoDel').addEventListener('click',()=>{S.setLogo=null;S.setLogoDrop=true;S.setDirty=true;drawLogoPrev()});
+$('#setHeroFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;$('#setMsg').textContent='';
+  const b=await cropImage(f,3,2000);if(!b)return;S.setHero=b;S.setHeroDrop=false;S.setDirty=true;if(S.setHeroUrl)URL.revokeObjectURL(S.setHeroUrl);S.setHeroUrl=URL.createObjectURL(b);drawHeroPrev()});
+$('#setHeroDel').addEventListener('click',()=>{S.setHero=null;S.setHeroDrop=true;S.setDirty=true;drawHeroPrev()});
+$('#setShade').addEventListener('input',drawHeroPrev);
 document.addEventListener('click',e=>{
   const t=e.target.closest('.licthumb.has');if(t){const img=t.querySelector('img');if(img)openZoom(img.src,img.alt||"Driver's license");return}
 });
@@ -1226,6 +1249,8 @@ document.addEventListener('click',async e=>{
   const t=e.target;
   if(t.closest('[data-close]')){t.closest('dialog')?.close();return}
   if(t.closest('[data-defpw]')){openSetup();return}
+  const ps=t.closest('[data-psort]');if(ps&&S.admin){const want=ps.dataset.psort;if((S.settings?.postSort==='oldest')===(want==='oldest'))return;
+    try{await savePostSort(want);renderPhotos();toast(want==='oldest'?'Oldest first. Customers see the same order.':'Newest first. Customers see the same order.')}catch(x){toast('Not saved. Try again.')}return}
   const dp=t.closest('[data-drvpic]');if(dp){openZoom(dp.src,dp.alt);return}
   const pv=t.closest('[data-pfview]');if(pv){const[o,bid,sd,i]=pv.dataset.pfview.split('|');openPf(o,bid,sd,+i);return}
   if(t.closest('[data-showterms]')){e.preventDefault();$('#tmBody').innerHTML=termsHtml(SET().terms)+(termsDate()?`<p class="small">Last updated ${esc(termsDate())}.</p>`:'');$('#dTerms').showModal();return}
