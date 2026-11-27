@@ -212,6 +212,14 @@ tr.click:hover td{background:var(--surf)}
 .msg{max-width:78%;padding:9px 13px;border-radius:16px 16px 16px 4px;background:var(--bg);border:1px solid var(--line);white-space:pre-wrap;overflow-wrap:anywhere;align-self:flex-start}
 .msg.me{align-self:flex-end;background:var(--co);color:var(--coink);border-color:var(--co);border-radius:16px 16px 4px 16px}
 .msg time{display:block;font-size:12px;opacity:.75;margin-top:2px}
+.mimg{display:block;padding:0;border:0;background:rgba(0,0,0,.06);cursor:zoom-in;margin:-3px -7px 6px;border-radius:12px;overflow:hidden;width:min(260px,62vw)}
+.mimg img{display:block;width:100%;max-height:320px;min-height:90px;object-fit:cover}
+.msgpend{display:flex;gap:10px;align-items:center;padding:10px 12px 0;border-top:1px solid var(--line)}
+.msgpend img{width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.msgpend+.compose{border-top:0}
+.mpick{display:grid;place-items:center;width:46px;height:46px;flex:none;border-radius:12px;border:1px solid var(--line);background:var(--card);cursor:pointer;color:var(--ink)}
+.mpick:hover{background:var(--surf)}
+.mpick svg{width:22px;height:22px}
 .macts{display:flex;gap:4px;justify-content:flex-end;margin:4px -6px -4px 0}
 .macts button{background:none;border:0;color:inherit;font:inherit;font-size:12px;font-weight:600;padding:4px 6px;border-radius:6px;cursor:pointer;opacity:.85;text-decoration:underline;text-underline-offset:2px}
 .macts button:hover{opacity:1;background:rgba(255,255,255,.18)}
@@ -422,6 +430,17 @@ nav a:hover{border-radius:10px}
 .hero-photo img{width:100%;height:100%;object-fit:cover;object-position:center;display:block}
 .hero-photo::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,22,48,var(--shade,.75)) 0%,rgba(8,22,48,calc(var(--shade,.75) * .75)) 50%,rgba(8,22,48,calc(var(--shade,.75) * .35)) 100%)}
 @media(max-width:760px){.hero-photo::after{background:rgba(8,22,48,var(--shade,.75))}}
+.findus{background:var(--card);border-top:1px solid var(--line);padding:56px 0}
+.findus-in{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:32px;align-items:center}
+.findus h2{font-size:clamp(28px,3.4vw,36px);line-height:1.05}
+.findus dl{display:grid;gap:10px;margin:0;font-size:16px}
+.findus dt{font-weight:700}.findus dd{margin:0}
+.mapbox{border-radius:20px;overflow:hidden;border:1px solid var(--line);aspect-ratio:16/10;background:var(--surf);box-shadow:0 10px 30px rgba(10,30,60,.12)}
+.mapbox iframe{width:100%;height:100%;border:0;display:block}
+@media(max-width:860px){.findus-in{grid-template-columns:minmax(0,1fr)}.findus .mapbox{order:-1}.findus{padding:36px 0}}
+.pickpt{display:flex;gap:8px 10px;align-items:center;flex-wrap:wrap;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.pickpt svg{width:20px;height:20px;color:var(--co);flex:none}
+.foot-site .dir{color:#ffb067;font-weight:700;white-space:nowrap}
 .psort{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;margin:22px 0 14px}
 .heroprev{position:relative;width:100%;max-width:360px;aspect-ratio:3/1;border-radius:12px;overflow:hidden;background:var(--band);border:1px solid var(--line)}
 .heroprev img,.heroprev svg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}

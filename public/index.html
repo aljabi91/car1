@@ -6,7 +6,7 @@
 <title>Car Rental System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=202611271004">
+<link rel="stylesheet" href="css/style.css?v=202611271029">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -144,7 +144,7 @@
         <div class="conv">
           <div class="convh" id="convh"></div>
           <div class="msgs" id="msgs" aria-live="polite"></div>
-          <form class="compose" id="compose"><label for="msgIn" class="hide">Message</label><textarea id="msgIn" placeholder="Write a message"></textarea><button class="btn go" id="msgSend">Send</button></form>
+          <div class="msgpend hide" id="msgPend"></div><form class="compose" id="compose"><label class="mpick" for="msgImg" title="Send a photo" aria-label="Send a photo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3v13H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg></label><input type="file" id="msgImg" accept="image/*" class="vh"><label for="msgIn" class="hide">Message</label><textarea id="msgIn" placeholder="Write a message"></textarea><button class="btn go" id="msgSend">Send</button></form>
         </div>
       </div>
     </div>
@@ -250,6 +250,8 @@
             <div><label for="setEmail">Email</label><input id="setEmail" type="email" placeholder="hello@yourrental.com"></div>
             <div><label for="setAddr">Office address</label><input id="setAddr" placeholder="Street, city"></div>
             <div><label for="setHours">Office hours</label><input id="setHours" placeholder="Mon to Sat, 8 AM to 6 PM"></div>
+            <div><label for="setMap">Office location on Google Maps (optional)</label><textarea id="setMap" rows="2" placeholder="Paste the embed code or a Google Maps link"></textarea><p class="hint">Most exact: in Google Maps on a computer, find your office, click <b>Share</b>, then <b>Embed a map</b>, then <b>Copy HTML</b>, and paste it here. A Google Maps link also works. Leave it empty to use the office address above.</p></div>
+            <label class="check" style="margin:0"><input type="checkbox" id="setMapShow">Show the "Find us" map at the bottom of the Cars page</label>
             <h3 style="margin-top:6px">Social media and other links</h3>
             <p class="small">Shown as clickable links under Contact us. Each link must start with https://</p>
             <div class="two">
@@ -325,6 +327,17 @@
       </div>
     </section>
 </main>
+<section class="findus hide" id="findUs" aria-labelledby="fuT">
+  <div class="wrap findus-in">
+    <div style="display:grid;gap:14px">
+      <h2 id="fuT">Find us</h2>
+      <p class="sub" style="margin:0" id="fuSub"></p>
+      <dl id="fuList"></dl>
+      <div class="acts" style="justify-content:flex-start;margin-top:4px"><a class="btn go lg" id="fuDir" target="_blank" rel="noopener">Get directions</a><a class="btn lg" id="fuOpen" target="_blank" rel="noopener">Open in Google Maps</a></div>
+    </div>
+    <div class="mapbox" id="fuMap"></div>
+  </div>
+</section>
 <footer class="foot-site">
   <div class="wrap foot-in">
     <div><a class="brand" href="#fleet"><span class="blogo" id="footLogo"></span><span id="footName">Car Rental</span></a><p class="small" id="footTag" style="margin-top:8px">Book online. Every request is confirmed by our office.</p></div>
@@ -555,6 +568,6 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<script src="js/app.js?v=202611271004"></script>
+<script src="js/app.js?v=202611271029"></script>
 </body>
 </html>

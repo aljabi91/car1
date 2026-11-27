@@ -157,7 +157,7 @@ function route(){
   renderBell();fitHeader();
   const tot=(S.admin?pend:0)+unread;$('#menuDot').textContent=tot;$('#menuDot').classList.toggle('hide',!tot);
   if(S.view!==h)scrollTo(0,0);
-  S.view=h;render();
+  S.view=h;renderFindUs();render();
 }
 addEventListener('hashchange',route);
 function fitHeader(){const top=$('.top');top.classList.remove('compact');
@@ -248,6 +248,7 @@ function renderMine(){
       <div>${esc(fmt(b.start))} to ${esc(fmt(b.end))}</div>
       <div class="small">${plural(+b.days||0,'day')} · <b style="color:var(--ink)">${esc(peso(b.total))}</b> · ${b.pickup==='delivery'?'Delivered to your address':'Pick up at the office'} · Ref <span class="plate">${esc(b.ref)}</span></div>
       ${i>=0?`<ol class="track" aria-label="Booking progress">${['Requested','Approved','Picked up','Returned'].map((l,k)=>`<li class="${k<=i?'done':''}">${l}</li>`).join('')}</ol>`:''}
+      ${b.pickup!=='delivery'&&['pending','approved','active'].includes(b.status)&&mapInfo().addr?`<div class="pickpt">${ic2('pin')}<span><b>Pickup point:</b> ${esc(mapInfo().addr)}</span>${mapInfo().dir?`<a class="btn sm go" href="${esc(mapInfo().dir)}" target="_blank" rel="noopener">Get directions</a>`:''}</div>`:''}
       ${needsDriver(b)&&!['rejected','cancelled'].includes(b.status)?`<div class="drvline">${drvPic(b)}<span><b>Your driver:</b> ${b.driverName?`${esc(b.driverName)}, ${esc(b.driverPhone||'')}`:'<span class="small">the office will assign a driver and tell you here.</span>'}</span></div>`:''}
       ${(b.changes||[]).length?`<p class="okmsg" style="margin-top:6px;font-weight:500"><b>Changed by the office on ${esc(tAt(b.changes.at(-1).at))}:</b> ${esc(b.changes.at(-1).what)}</p>`:''}
       ${b.adminNote?`<p class="note" style="margin-top:6px"><b>Comment from the office:</b> ${esc(b.adminNote)}</p>`:''}
@@ -325,8 +326,11 @@ async function writeThread(coll,owner,key,fn){
   const threads=JSON.parse(JSON.stringify(d?.threads||{}));threads[key]=fn(threads[key]||{msgs:[]});
   await serial(coll+owner,()=>S.db.doc(coll+'/'+owner).set({...(d?Object.fromEntries(Object.entries(d).filter(([k])=>k!=='id')):{}),threads,updatedAt:Date.now()}));
 }
-async function sendMsg(text){
+const msgPreview=m=>m.img?('Photo'+(m.text?': '+m.text:'')):(m.text||'');
+const cut90=t=>t.length>90?t.slice(0,90)+'…':t;
+async function sendMsg(text,img){
   const now=Date.now();const m={id:uid(),text,at:now};
+  if(img){const owner=S.admin?S.thread.owner:S.uid;m.img={id:await pfSave(owner,img)}}
   if(S.admin){const t=S.thread;await writeThread('replies',t.owner,t.key,x=>({...x,name:t.name,phone:t.phone,msgs:[...(x.msgs||[]),m].slice(-300),seen:now}))}
   else await writeThread('chats',S.uid,myKey(),x=>({...x,name:S.session.name,phone:myPhone(),msgs:[...(x.msgs||[]),m].slice(-300),seen:now}));
 }
@@ -345,7 +349,7 @@ function renderMessages(){
   if(adm){
     const list=allThreads();
     if(S.thread&&!list.some(x=>x.owner===S.thread.owner&&x.key===S.thread.key))list.unshift(getThread(S.thread.owner,S.thread.key));
-    $('#threads').innerHTML=list.length?list.map(x=>`<button class="th" data-th="${esc(x.owner)}|${esc(x.key)}" aria-current="${S.thread?.owner===x.owner&&S.thread?.key===x.key}"><b>${esc(x.name||S.thread?.name||'Customer')}</b>${x.unreadA?`<span class="badge">${x.unreadA}</span>`:'<span></span>'}<span class="last">${esc(x.msgs.at(-1)?.text||'No messages yet')}</span></button>`).join(''):'<p class="small" style="padding:16px">No messages yet.</p>';
+    $('#threads').innerHTML=list.length?list.map(x=>`<button class="th" data-th="${esc(x.owner)}|${esc(x.key)}" aria-current="${S.thread?.owner===x.owner&&S.thread?.key===x.key}"><b>${esc(x.name||S.thread?.name||'Customer')}</b>${x.unreadA?`<span class="badge">${x.unreadA}</span>`:'<span></span>'}<span class="last">${esc(x.msgs.length?msgPreview(x.msgs.at(-1)):'No messages yet')}</span></button>`).join(''):'<p class="small" style="padding:16px">No messages yet.</p>';
     chat.classList.toggle('open',!!S.thread);
     if(!S.thread){$('#convh').innerHTML='';$('#msgs').innerHTML='<div class="empty" style="margin:auto">Choose a conversation.</div>';$('#compose').classList.add('hide');return}
     t=getThread(S.thread.owner,S.thread.key);
@@ -358,18 +362,25 @@ function renderMessages(){
   const box=$('#msgs');const atEnd=box.scrollHeight-box.scrollTop-box.clientHeight<40;
   if(S.editMsg&&!t.msgs.some(m=>m.from===me&&m.id===S.editMsg))S.editMsg=null;
   const ed=$('#msgEdit');if(ed)S.editDraft=ed.value;
+  const owner=adm?t.owner:S.uid;
   box.innerHTML=t.msgs.length?t.msgs.map(m=>{const mine=m.from===me;const who=mine?'You':adm?esc(t.name||'Customer'):'Rental office';const tm=`<time>${who}, ${esc(tAt(m.at))}${m.edited?' · Edited':''}</time>`;
+    const pic=m.img?.id?`<button type="button" class="mimg" data-mimg="${esc(owner)}|${esc(m.img.id)}" aria-label="See the photo larger"><img data-pfid="${esc(m.img.id)}" data-pfo="${esc(owner)}" ${S.pfCache[m.img.id]?`src="${esc(S.pfCache[m.img.id])}"`:''} alt="Photo from ${mine?'you':who}"></button>`:'';
     if(mine&&m.id&&S.editMsg===m.id)return`<div class="msg me editing"><label for="msgEdit" class="hide">Edit your message</label><textarea id="msgEdit">${esc(S.editDraft??m.text)}</textarea><div class="macts"><button type="button" class="mcancel" data-mcancel>Cancel</button><button type="button" class="msave" data-msave="${esc(m.id)}">Save</button></div></div>`;
-    return`<div class="msg${mine?' me':''}">${esc(m.text)}${tm}${mine&&m.id?`<div class="macts"><button type="button" data-medit="${esc(m.id)}">Edit</button><button type="button" data-mdel="${esc(m.id)}">Delete</button></div>`:''}</div>`}).join(''):`<div class="empty" style="margin:auto">${adm?'No messages yet. Write the first one below.':'No messages yet. Write to the office below.'}</div>`;
-  if(atEnd||!S.msgScrolled){box.scrollTop=box.scrollHeight;S.msgScrolled=true}
+    return`<div class="msg${mine?' me':''}">${pic}${esc(m.text||'')}${tm}${mine&&m.id?`<div class="macts">${m.text||!m.img?`<button type="button" data-medit="${esc(m.id)}">Edit</button>`:''}<button type="button" data-mdel="${esc(m.id)}">Unsend</button></div>`:''}</div>`}).join(''):`<div class="empty" style="margin:auto">${adm?'No messages yet. Write the first one below.':'No messages yet. Write to the office below.'}</div>`;
+  fillPfImgs(box);box.querySelectorAll('.mimg img:not([src])').forEach(im=>im.addEventListener('load',()=>{if(S.msgStick)box.scrollTop=box.scrollHeight},{once:true}));
+  if(atEnd||!S.msgScrolled){box.scrollTop=box.scrollHeight;S.msgScrolled=true;S.msgStick=true}else S.msgStick=false;
   if(S.draft){$('#msgIn').value=S.draft;S.draft='';$('#msgIn').focus()}
   const ne=$('#msgEdit');if(ne&&S.editFocus){S.editFocus=false;ne.focus();ne.setSelectionRange(ne.value.length,ne.value.length)}
   clearTimeout(S.seenT);S.seenT=setTimeout(markSeen,800);
 }
+function drawMsgPend(){const p=$('#msgPend');p.classList.toggle('hide',!S.msgImg);p.innerHTML=S.msgImg?`<img src="${esc(S.msgImg)}" alt="Photo to send"><span class="small" style="flex:1">Photo ready. Add a message if you like, then tap Send.</span><button type="button" class="btn sm danger" id="msgImgX">Remove</button>`:''}
+$('#msgImg').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{S.msgImg=await proofImg(f);drawMsgPend();$('#msgIn').focus()}catch(x){toast(x?.message||'That photo could not be used.')}});
+$('#msgPend').addEventListener('click',e=>{if(e.target.closest('#msgImgX')){S.msgImg='';drawMsgPend()}});
 $('#compose').addEventListener('submit',async e=>{
-  e.preventDefault();const v=$('#msgIn').value.trim();if(!v)return;
-  const b=$('#msgSend');b.disabled=true;
-  try{await sendMsg(v);$('#msgIn').value='';S.msgScrolled=false;renderMessages()}catch(x){toast('Message not sent. Try again.')}finally{b.disabled=false}
+  e.preventDefault();const v=$('#msgIn').value.trim();if(!v&&!S.msgImg)return;
+  const b=$('#msgSend');b.disabled=true;if(S.msgImg)b.textContent='Sending…';
+  try{await sendMsg(v,S.msgImg||'');$('#msgIn').value='';S.msgImg='';drawMsgPend();S.msgScrolled=false;renderMessages()}catch(x){toast('Message not sent. '+(x?.message||'Try again.'))}finally{b.disabled=false;b.textContent='Send'}
 });
 async function changeMyMsg(id,fn){
   if(S.admin){const t=S.thread;await writeThread('replies',t.owner,t.key,x=>({...x,msgs:fn(x.msgs||[])}))}
@@ -377,7 +388,8 @@ async function changeMyMsg(id,fn){
 }
 async function saveEditMsg(id){
   const v=($('#msgEdit')?.value||'').trim();
-  if(!v){toast('The message is empty. Write something, or use Delete.');return}
+  const cur=getThread(S.admin?S.thread.owner:S.uid,S.admin?S.thread.key:myKey()).msgs.find(m=>m.id===id);
+  if(!v&&!cur?.img){toast('The message is empty. Write something, or use Unsend.');return}
   const b=$('[data-msave]');if(b)b.disabled=true;
   try{await changeMyMsg(id,ms=>ms.map(m=>m.id===id?(m.text===v?m:{...m,text:v,edited:true,editedAt:Date.now()}):m));S.editMsg=null;S.editDraft=null;renderMessages();toast('Message updated')}
   catch(x){toast('Message not updated. Try again.');if(b)b.disabled=false}
@@ -387,9 +399,11 @@ $('#msgs').addEventListener('click',async e=>{
   const ed=t.closest('[data-medit]');if(ed){S.editMsg=ed.dataset.medit;S.editDraft=null;S.editFocus=true;renderMessages();return}
   if(t.closest('[data-mcancel]')){S.editMsg=null;S.editDraft=null;renderMessages();return}
   const sv=t.closest('[data-msave]');if(sv){saveEditMsg(sv.dataset.msave);return}
-  const dl=t.closest('[data-mdel]');if(dl){
-    if(!await ask(S.admin?'Delete this message? The customer will no longer see it.':'Delete this message? The office will no longer see it.','Delete'))return;
-    try{await changeMyMsg(dl.dataset.mdel,ms=>ms.filter(m=>m.id!==dl.dataset.mdel));renderMessages();toast('Message deleted')}catch(x){toast('Message not deleted. Try again.')}
+  const mi=t.closest('[data-mimg]');if(mi){const[o,fid]=mi.dataset.mimg.split('|');try{const d=await pfGet(o,fid);if(d)openZoom(d,'Photo')}catch(x){toast('The photo could not be opened.')}return}
+  const dl=t.closest('[data-mdel]');if(dl){const id=dl.dataset.mdel;
+    if(!await ask(S.admin?'Unsend this message? It will be removed for you and the customer.':'Unsend this message? It will be removed for you and the office.','Unsend'))return;
+    let img='';try{await changeMyMsg(id,ms=>ms.filter(m=>{if(m.id!==id)return true;img=m.img?.id||'';return false}));
+      if(img)pfDel(S.admin?S.thread.owner:S.uid,img);if(S.editMsg===id)S.editMsg=null;renderMessages();toast('Message unsent')}catch(x){toast('Message not unsent. Try again.')}
   }
 });
 $('#msgs').addEventListener('keydown',e=>{
@@ -705,7 +719,7 @@ function renderSettings(){
   if(S.setDirty)return;const st=SET();
   S.setEx=st.extras.map(x=>({...x}));drawExRows();
   $('#setDel').value=st.delivery;$('#setCancel').value=st.cancelDays;$('#setCancelText').value=st.cancelText;$('#setMsg').textContent='';$('#setTerms').value=st.terms;$('#setTermsSample').classList.toggle('hide',typeof S.settings?.terms==='string');
-  $('#setName').value=st.siteName;{const c=st.contact||{};$('#setPhone').value=c.phone||'';$('#setEmail').value=c.email||'';$('#setAddr').value=c.addr||'';$('#setHours').value=c.hours||'';SOCIALS.forEach(([k,id])=>$('#'+id).value=c[k]||'');$('#setOtherL').value=c.otherLabel||''}S.setLogo=null;S.setLogoDrop=false;S.setLogoId=st.logoId;drawLogoPrev();S.setHero=null;S.setHeroDrop=false;S.setHeroId=st.heroId;$('#setShade').value=st.heroShade;drawHeroPrev();
+  $('#setName').value=st.siteName;{const c=st.contact||{};$('#setPhone').value=c.phone||'';$('#setEmail').value=c.email||'';$('#setAddr').value=c.addr||'';$('#setHours').value=c.hours||'';SOCIALS.forEach(([k,id])=>$('#'+id).value=c[k]||'');$('#setOtherL').value=c.otherLabel||'';$('#setMap').value=c.map||'';$('#setMapShow').checked=c.showMap!==false}S.setLogo=null;S.setLogoDrop=false;S.setLogoId=st.logoId;drawLogoPrev();S.setHero=null;S.setHeroDrop=false;S.setHeroId=st.heroId;$('#setShade').value=st.heroShade;drawHeroPrev();
 }
 function drawHeroPrev(){const src=S.setHero?S.setHeroUrl:(!S.setHeroDrop&&S.setHeroId?imgUrl(S.setHeroId):'');const pv=$('#setHeroPrev');
   pv.style.setProperty('--shade',(+$('#setShade').value||60)/100);
@@ -735,9 +749,11 @@ $('#setSave').addEventListener('click',async()=>{
   const siteName=$('#setName').value.trim().replace(/\s+/g,' ');
   if(!siteName){msg.textContent='Enter a website name.';$('#setName').focus();return}
   if(S.setLogo&&!S.assets){msg.textContent='Only the admin can upload a logo.';return}
-  const contact={phone:$('#setPhone').value.trim(),email:$('#setEmail').value.trim(),addr:$('#setAddr').value.trim(),hours:$('#setHours').value.trim(),otherLabel:$('#setOtherL').value.trim()};SOCIALS.forEach(([k,id])=>contact[k]=$('#'+id).value.trim());
+  const contact={phone:$('#setPhone').value.trim(),email:$('#setEmail').value.trim(),addr:$('#setAddr').value.trim(),hours:$('#setHours').value.trim(),otherLabel:$('#setOtherL').value.trim(),map:$('#setMap').value.trim().slice(0,3000),showMap:$('#setMapShow').checked};SOCIALS.forEach(([k,id])=>contact[k]=$('#'+id).value.trim());
   if(contact.email&&!/^\S+@\S+\.\S+$/.test(contact.email)){msg.textContent='Check the email address in Contact details.';$('#setEmail').focus();return}
   for(const [k,id,l] of SOCIALS){if(contact[k]&&!/^https:\/\/\S+\.\S+/i.test(contact[k])){msg.textContent=`The ${l} link must start with https://`;$('#'+id).focus();return}}
+  if(contact.map&&!/src=["']https:\/\/www\.google\.com\/maps\/embed\?/i.test(contact.map)&&!/^https:\/\/((www\.)?google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl\/maps)\S*$/i.test(contact.map)){msg.textContent='The office location must be the embed code from Google Maps (Share, then Embed a map) or a Google Maps link.';$('#setMap').focus();return}
+  if(contact.showMap&&!contact.map&&!contact.addr){msg.textContent='To show the map, enter the office address or paste the Google Maps location.';$('#setAddr').focus();return}
   if(contact.other&&!contact.otherLabel){msg.textContent='Give the other link a name, such as "Viber community".';$('#setOtherL').focus();return}
   if(S.setHero&&!S.assets){msg.textContent='Only the admin can upload a banner photo.';return}
   const b=$('#setSave');b.disabled=true;const oldLogo=SET().logoId,oldHero=SET().heroId;
@@ -881,10 +897,10 @@ function notifList(){const out=[];const cut=Date.now()-45*864e5;
   if(S.admin){
     allBookings().forEach(b=>{if((b.createdAt||0)>cut)out.push({id:'b:'+b.id,ic:'car',t:b.createdAt,html:`<b>New booking${b.status==='pending'?' request':''}:</b> ${esc(b.name)} booked the ${esc(b.carName)}, ${esc(fmtD(b.start))} to ${esc(fmtD(b.end))}`,go:()=>openDetail(b.owner,b.id)});
       if(b.status==='cancelled'&&b.cancelledBy==='customer'&&(b.updatedAt||0)>cut)out.push({id:'c:'+b.id,ic:'x2',t:b.updatedAt,html:`<b>Booking cancelled:</b> ${esc(b.name)} cancelled ${esc(b.ref)} (${esc(b.carName)})`,go:()=>openDetail(b.owner,b.id)})});
-    allThreads().forEach(th=>{const last=[...(th.c.msgs||[])].pop();if(!last||last.at<cut)return;out.push({id:`m:${th.owner}|${th.key}|${last.at}`,ic:'chat',t:last.at,auto:!th.unreadA,html:`<b>New message from ${esc(th.name||'a customer')}:</b> ${esc(last.text.length>90?last.text.slice(0,90)+'…':last.text)}`,go:()=>{S.thread={owner:th.owner,key:th.key,name:th.name,phone:th.phone};S.msgScrolled=false;location.hash='#messages';route();markSeen()}})});
+    allThreads().forEach(th=>{const last=[...(th.c.msgs||[])].pop();if(!last||last.at<cut)return;out.push({id:`m:${th.owner}|${th.key}|${last.at}`,ic:'chat',t:last.at,auto:!th.unreadA,html:`<b>New message from ${esc(th.name||'a customer')}:</b> ${esc(cut90(msgPreview(last)))}`,go:()=>{S.thread={owner:th.owner,key:th.key,name:th.name,phone:th.phone};S.msgScrolled=false;location.hash='#messages';route();markSeen()}})});
   }else if(S.session?.role==='customer'){
     const th=getThread(S.uid,myKey());const last=[...(th.a.msgs||[])].pop();
-    if(last&&last.at>cut)out.push({id:'r:'+last.at,ic:'chat',t:last.at,auto:!th.unreadC,html:`<b>Message from the office:</b> ${esc(last.text.length>90?last.text.slice(0,90)+'…':last.text)}`,go:()=>{S.msgScrolled=false;location.hash='#messages';route()}});
+    if(last&&last.at>cut)out.push({id:'r:'+last.at,ic:'chat',t:last.at,auto:!th.unreadC,html:`<b>Message from the office:</b> ${esc(cut90(msgPreview(last)))}`,go:()=>{S.msgScrolled=false;location.hash='#messages';route()}});
     const W={approved:'is approved',rejected:'was not approved',active:'is picked up. Enjoy your trip!',completed:'is returned. Thank you for renting with us!',cancelled:'is cancelled'};
     myItems().forEach(b=>{const t=b.updatedAt||0;if(t<cut)return;const ch=(b.changes||[]).at(-1);
       if(b.status!=='pending'&&!(b.status==='cancelled'&&b.cancelledBy==='customer'))out.push({id:`u:${b.id}:${b.status}`,ic:'car',t:ch&&ch.at>t-2000&&b.status==='approved'?t-1:t,html:`<b>Booking ${esc(b.ref)}</b> ${esc(W[b.status]||'was updated')}${b.status==='approved'&&b.driverName?` · Driver: ${esc(b.driverName)}`:''}`,go:()=>{location.hash='#my-bookings';route()}});
@@ -908,16 +924,31 @@ $('#nList').addEventListener('click',e=>{const b=e.target.closest('[data-ni]');i
 $('#nAll').addEventListener('click',e=>{e.stopPropagation();markRead((S.nList||[]).filter(n=>!n.read).map(n=>n.id))});
 document.addEventListener('click',e=>{if(!$('#nPanel').hidden&&!e.target.closest('#notifWrap')){$('#nPanel').hidden=true;$('#bellBtn').setAttribute('aria-expanded','false')}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#nPanel').hidden){$('#nPanel').hidden=true;$('#bellBtn').focus()}});
+/* office location: from the pasted Google Maps embed code or link, or the office address */
+function mapInfo(){const c=SET().contact||{};const raw=String(c.map||'').trim(),addr=String(c.addr||'').trim();
+  const em=/src=["'](https:\/\/www\.google\.com\/maps\/embed\?[^"'<>\s]+)["']/i.exec(raw);
+  const link=!em&&/^https:\/\/((www\.)?google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl\/maps)\S*$/i.test(raw)?raw:'';
+  const ll=/@(-?\d+\.\d+),(-?\d+\.\d+)/.exec(link)||/[?&](?:q|query|ll)=(-?\d+\.\d+),\s*(-?\d+\.\d+)/.exec(link);const coords=ll?ll[1]+','+ll[2]:'';
+  const place=coords||addr;
+  const embed=em?em[1].replace(/&amp;/g,'&'):place?`https://www.google.com/maps?q=${encodeURIComponent(place)}&z=16&output=embed`:'';
+  const dir=place?`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place)}`:link;
+  const open=link||(place?`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`:'');
+  return{embed,dir,open,addr,show:c.showMap!==false&&!!embed}}
+function renderFindUs(){const st=SET(),c=st.contact||{},m=mapInfo();const box=$('#findUs');box.classList.toggle('hide',!(m.show&&S.view==='fleet'));if(!m.show)return;
+  $('#fuSub').textContent=`Pick up your car at our office${m.addr?'':''}, or we deliver to your address.`;
+  $('#fuList').innerHTML=[m.addr&&['Address',m.addr],c.hours&&['Office hours',c.hours],c.phone&&['Phone',c.phone]].filter(Boolean).map(([k,v])=>`<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
+  $('#fuDir').href=m.dir||'#';$('#fuDir').classList.toggle('hide',!m.dir);$('#fuOpen').href=m.open||'#';$('#fuOpen').classList.toggle('hide',!m.open);
+  if(S.mapSrc!==m.embed){S.mapSrc=m.embed;$('#fuMap').innerHTML=`<iframe src="${esc(m.embed)}" title="Map showing ${esc(st.siteName)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>`}}
 function renderFooter(){const st=SET();const c=st.contact||{};$('#footTermsLi').classList.toggle('hide',!st.terms.trim());
   $('#footName').textContent=st.siteName;$('#footLogo').innerHTML=st.logoId?`<img src="${esc(imgUrl(st.logoId))}" alt="">`:'<svg width="34" height="22" style="color:#fff"><use href="#i-car"/></svg>';
-  const li=[];if(c.phone)li.push(`<li>${ic2('phone')}<span>${esc(c.phone)}</span></li>`);if(c.email)li.push(`<li>${ic2('mail')}<span>${esc(c.email)}</span></li>`);if(c.addr)li.push(`<li>${ic2('pin')}<span>${esc(c.addr)}</span></li>`);if(c.hours)li.push(`<li>${ic2('clock')}<span>${esc(c.hours)}</span></li>`);li.push(`<li class="small" style="color:#c9d6ee">${ic2('chat')}<span>Message us after you book, under <a href="${S.session&&!S.admin?'#messages':'#login'}">Messages</a>.</span></li>`);
+  const li=[];if(c.phone)li.push(`<li>${ic2('phone')}<span>${esc(c.phone)}</span></li>`);if(c.email)li.push(`<li>${ic2('mail')}<span>${esc(c.email)}</span></li>`);if(c.addr){const md=mapInfo().dir;li.push(`<li>${ic2('pin')}<span>${esc(c.addr)}${md?` <a class="dir" href="${esc(md)}" target="_blank" rel="noopener">Get directions</a>`:''}</span></li>`)}if(c.hours)li.push(`<li>${ic2('clock')}<span>${esc(c.hours)}</span></li>`);li.push(`<li class="small" style="color:#c9d6ee">${ic2('chat')}<span>Message us after you book, under <a href="${S.session&&!S.admin?'#messages':'#login'}">Messages</a>.</span></li>`);
   const soc=SOCIALS.filter(([k])=>/^https:\/\//i.test(c[k]||'')).map(([k,,l])=>`<a class="soc" href="${esc(c[k])}" target="_blank" rel="noopener">${ic2(k==='fb'?'fb':k)}<span>${esc(k==='other'?(c.otherLabel||'Other link'):k==='fb'?'Facebook':l)}</span></a>`);
   if(soc.length)li.push(`<li class="socs">${soc.join('')}</li>`);else if(S.admin)li.push('<li class="small">Add your social media links in Settings.</li>');
   $('#footContact').innerHTML=li.join('');
   $('#footCopy').textContent=`© ${new Date().getFullYear()} ${st.siteName}`;$('#heroKicker').textContent=st.siteName;
   $('#footLogin').textContent=S.session?'My account':'Log in';$('#footLogin').href=S.session?(S.admin?'#bookings':'#my-bookings'):'#login'}
 function applyBrand(){
-  const st=SET();$('#brandName').textContent=st.siteName;renderFooter();renderTrust();
+  const st=SET();$('#brandName').textContent=st.siteName;renderFooter();renderTrust();renderFindUs();
   const hsrc=st.heroId?imgUrl(st.heroId):'';if(S.heroSrc!==hsrc){S.heroSrc=hsrc;if(hsrc)$('#heroImg').src=hsrc;else $('#heroImg').removeAttribute('src')}
   $('#heroPhoto').classList.toggle('hide',!hsrc);$('.hero .scene').classList.toggle('hide',!!hsrc);$('#heroPhoto').style.setProperty('--shade',st.heroShade/100);
   const src=st.logoId?imgUrl(st.logoId):'';
